@@ -1,0 +1,40 @@
+{
+  // Defines clickable screen areas (trigger boxes) for mouse interaction
+  // These boxes are projected onto the screen surface and detect clicks
+  "$configType": "triggerBoxes",
+
+  "boxes": [
+    {
+      // Position relative to reference plane (meters)
+      // Center of the trigger box in local coordinates
+      "pos": { "x": 0, "y": 0, "z": 0 },
+
+      // Scale of the box (size multiplier)
+      // Adjusts the box dimensions - smaller values = smaller clickable area
+      // Adjust scale to fit the physical size of your screen in the vehicle
+      "scale": 0.235,
+
+      // Depth of the trigger volume (meters)
+      // How far the box extends from the screen surface
+      // A value above 0 is required to ensure reliable click detection
+      // Increasing depth beyond 0.0001 is not recommended; use rotation for angled screens instead
+      "depth": 0.0001,
+
+      // Rotation of the box (degrees)
+      // Usually matches screen orientation - 90° on X aligns with typical dash mount
+      "rot": { "x": 90, "y": 0, "z": 0 },
+
+      // Unique identifier for this trigger box
+      // Used in JavaScript event handlers to identify which box was clicked
+      "id": "infotainment",
+
+      // Reference plane ID to use for positioning
+      // "0" uses the main reference plane defined in referencePlane.jsonc
+      "refPlane": "0",
+
+      // Which screen this trigger box controls
+      // Must match a screen name defined in the vehicle's jbeam controller section
+      "screenId": "vivace_infotainment"
+    }
+  ]
+}

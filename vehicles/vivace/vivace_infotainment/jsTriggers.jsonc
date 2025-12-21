@@ -1,0 +1,30 @@
+{
+  // Defines physical trigger volumes (3D boxes) for interaction detection
+  // Unlike trigger boxes (flat screen clicks), these are 3D volumes in space
+  // Useful for detecting finger/hand proximity or physical button locations
+  "$configType": "triggers",
+
+  "triggers": [
+    {
+      // Unique identifier for this trigger volume
+      // JavaScript event handlers receive this ID when the trigger activates
+      "id": "acMax",
+
+      // Position relative to reference plane (meters)
+      // Where the center of the volume is located in 3D space
+      "pos": { "x": 0.043, "y": 0.072, "z": 0.019 },
+
+      // Size of the trigger volume (meters)
+      // Width (x), height (y), depth (z) of the detection box
+      "size": { "x": 0.06, "y": 0.001, "z": 0.03 },
+
+      // Rotation of the volume (degrees)
+      // Allows angled trigger zones for non-perpendicular surfaces
+      "rot": { "x": 30, "y": 0, "z": 0 },
+
+      // Reference plane ID to use for positioning
+      // "0" uses the main reference plane defined in referencePlane.jsonc
+      "refPlane": "0"
+    }
+  ]
+}

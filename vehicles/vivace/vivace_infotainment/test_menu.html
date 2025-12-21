@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title></title>
+    <style>
+      body {
+        width: 1024px;
+        height: 512px;
+        background: #222;
+        color: #fff;
+        font-family: Arial, sans-serif;
+      }
+      .container {
+        display: flex;
+        height: calc(100% - 70px);
+        margin: 35px;
+        gap: 10px;
+      }
+      .sidebar {
+        width: 180px;
+        background: #333;
+        padding: 10px;
+      }
+      .sidebar h1 {
+        font-size: 16px;
+        margin-bottom: 15px;
+      }
+      .menu-item {
+        padding: 10px;
+        margin: 5px 0;
+        background: #555;
+        cursor: pointer;
+      }
+      .menu-item.active {
+        background: #777;
+      }
+      .content {
+        flex: 1;
+        padding: 10px;
+        position: relative;
+      }
+      .content-header {
+        font-size: 20px;
+        margin-bottom: 10px;
+      }
+
+      .content-body {
+        display: none;
+      }
+
+      .content-body.active {
+        display: block;
+      }
+      .button-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 2fr);
+        gap: 10px;
+      }
+      .action-button {
+        padding: 20px;
+        background: #444;
+        cursor: pointer;
+        text-align: center;
+      }
+      .action-button.selected {
+        background: #666;
+      }
+      .status {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #00000048;
+        padding: 8px;
+        font-family: monospace;
+        font-size: 9px;
+        pointer-events: none;
+      }
+      .status-line {
+        margin: 2px 0;
+      }
+      .back-button {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        padding: 8px 15px;
+        background: #ff2a2a;
+        cursor: pointer;
+      }
+      .scroll-container {
+        height: 300px;
+        overflow-y: scroll;
+        background: #333;
+        padding: 10px;
+      }
+      .scroll-item {
+        padding: 10px;
+        margin: 5px 0;
+        background: #444;
+      }
+      .draggable-box {
+        padding: 20px;
+        background: #446644;
+        cursor: move;
+        text-align: center;
+        position: relative;
+        user-select: none;
+      }
+      .draggable-box.dragging {
+        background: #666644;
+      }
+      .trigger-hint {
+        position: absolute;
+        bottom: -10px;
+        right: 55%;
+        transform: translateX(-50%);
+        background: #ff6600;
+        color: #fff;
+        padding: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      }
+      .trigger-hint::after {
+        content: "↓  ↓";
+        display: block;
+        font-size: 32px;
+        margin-top: 5px;
+        letter-spacing: 50px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="sidebar">
+        <h1>MAIN MENU</h1>
+        <div class="menu-item" data-page="main">Hello</div>
+        <div class="menu-item" data-page="creatures">Animal</div>
+        <div class="menu-item" data-page="test">other menu!!!</div>
+        <div class="menu-item" data-page="button">scroll test</div>
+        <div class="menu-item" data-page="info">Information</div>
+      </div>
+
+      <div class="content">
+        <div class="status">
+          <div class="status-line">
+            <span class="status-label">X:</span>
+            <span id="coord-x">0.000</span>
+          </div>
+          <div class="status-line">
+            <span class="status-label">Y:</span>
+            <span id="coord-y">0.000</span>
+          </div>
+          <div class="status-line">
+            <span class="status-label">Pixel X:</span>
+            <span id="pixel-x">0</span>
+          </div>
+          <div class="status-line">
+            <span class="status-label">Pixel Y:</span>
+            <span id="pixel-y">0</span>
+          </div>
+          <div class="status-line">
+            <span class="status-label">Event:</span>
+            <span id="event-type">none</span>
+          </div>
+          <div class="status-line">
+            <span class="status-label">Last Action:</span>
+            <span id="last-action">-</span>
+          </div>
+        </div>
+
+        <div class="content-body active" data-page="main">
+          <div class="trigger-hint">Click on one of these buttons!</div>
+          <div class="content-header">Welcome</div>
+          <p style="font-size: 18px; line-height: 0.9">
+            This implementation demonstrates a basic interactive menu <br/> system
+            using the screen input framework.<br/><br/>
+            Use the sidebar to navigate between pages, and interact with buttons <br/>
+            to see input events reflected in the status display.<br/><br/>
+            This setup can be expanded to create systems you might find in a
+            vehicle.<br/><br/>
+          </p>
+          <p style="font-size: 32px; line-height: 1">
+            This is just a demo menu for understanding the screen input system
+            and how to set it up.
+            <br />
+            It is misaligned, unpolished, and not intended for actual use!!!
+          </p>
+        </div>
+        <div class="content-body" data-page="creatures">
+          <div class="content-header">Animal</div>
+          <div class="button-grid">
+            <div class="action-button" data-action="1">doggy</div>
+            <div class="action-button" data-action="2">Fop</div>
+            <div class="action-button" data-action="3">Woofer</div>
+            <div class="action-button" data-action="4">Kitty</div>
+            <div class="action-button" data-action="5">Sneppy</div>
+            <div class="action-button" data-action="6">Tigur</div>
+          </div>
+        </div>
+        <div class="content-body" data-page="test">
+          <div class="content-header">other menu!!!</div>
+          <div
+            class="content-header"
+            style="font-size: 14px; margin-top: 10px; color: #888"
+          >
+            Try dragging the boxes! <br /><br /></b>
+            These are extremely inaccurate and just for demonstration purposes! <br />
+            Implement it properly in your own projects using standard javascript
+          </div>
+          <div class="button-grid">
+            <div
+              class="draggable-box"
+              data-box="1"
+              style="position: relative; left: 0px; top: 0px"
+            >
+              drag me
+            </div>
+            <div
+              class="draggable-box"
+              data-box="2"
+              style="position: relative; left: 0px; top: 0px"
+            >
+              drag me
+            </div>
+            <div
+              class="draggable-box"
+              data-box="3"
+              style="position: relative; left: 0px; top: 0px"
+            >
+              drag me
+            </div>
+            <div
+              class="draggable-box"
+              data-box="4"
+              style="position: relative; left: 0px; top: 0px"
+            >
+              drag me
+            </div>
+            <div
+              class="draggable-box"
+              data-box="5"
+              style="position: relative; left: 0px; top: 0px"
+            >
+              drag me
+            </div>
+            <div
+              class="draggable-box"
+              data-box="6"
+              style="position: relative; left: 0px; top: 0px"
+            >
+              drag me
+            </div>
+          </div>
+        </div>
+        <div class="content-body" data-page="button">
+          <div class="content-header">Scroll Test</div>
+          <p style="font-size: 12px; margin-bottom: 10px; color: #bdbdbd">
+            Use mouse wheel or drag to scroll:
+          </p>
+          <div class="scroll-container" id="scroll-test">
+            <div class="scroll-item">Item 1</div>
+            <div class="scroll-item">Item 2</div>
+            <div class="scroll-item">Item 3</div>
+            <div class="scroll-item">Item 4</div>
+            <div class="scroll-item">Item 5</div>
+            <div class="scroll-item">Item 6</div>
+            <div class="scroll-item">Item 7</div>
+            <div class="scroll-item">Item 8</div>
+            <div class="scroll-item">Item 9</div>
+            <div class="scroll-item">Item 10</div>
+            <div class="scroll-item">Item 11</div>
+            <div class="scroll-item">Item 12</div>
+            <div class="scroll-item">Item 13</div>
+            <div class="scroll-item">Item 14</div>
+            <div class="scroll-item">Item 15</div>
+          </div>
+        </div>
+        <div class="content-body" data-page="info">
+          <div class="content-header">Information</div>
+          <p style="font-size: 12px; line-height: 1.8">
+            <strong>There is no more information</strong><br /><br />
+          </p>
+        </div>
+
+        <div class="back-button" id="back-btn">← BACK TO HOME</div>
+      </div>
+    </div>
+
+    <!-- Screen Input Framework - Shared library from screenInput mod -->
+    <script src="/ui/modules/screenInput.js"></script>
+    <script>
+      // Initialize screenInput
+      window.initScreenInput(1024, 512, "vivace_infotainment");
+
+      let currentPage = "home";
+      const menuItems = document.querySelectorAll(".menu-item");
+      const contentBodies = document.querySelectorAll(".content-body");
+      const actionButtons = document.querySelectorAll(".action-button");
+      const backButton = document.getElementById("back-btn");
+      const coordX = document.getElementById("coord-x");
+      const coordY = document.getElementById("coord-y");
+      const pixelX = document.getElementById("pixel-x");
+      const pixelY = document.getElementById("pixel-y");
+      const eventType = document.getElementById("event-type");
+      const lastAction = document.getElementById("last-action");
+
+      // Hook into screenInput for status display
+      const originalOnInput = window.screenInput.onInput;
+      window.screenInput.onInput = function (eventData) {
+        coordX.textContent = (eventData.x || 0).toFixed(3);
+        coordY.textContent = (eventData.y || 0).toFixed(3);
+        pixelX.textContent = eventData.pixelX || Math.floor(eventData.x * 1024);
+        pixelY.textContent = eventData.pixelY || Math.floor(eventData.y * 512);
+        eventType.textContent = eventData.type || "none";
+        if (originalOnInput) originalOnInput(eventData);
+      };
+
+      // Wheel scrolling example
+      const scrollContainer = document.getElementById("scroll-test");
+      if (scrollContainer) {
+        scrollContainer.addEventListener("wheel", (e) => {
+          lastAction.textContent = `Scrolled: ${e.deltaY.toFixed(0)}`;
+        });
+        scrollContainer.addEventListener("drag", (e) => {
+          scrollContainer.scrollTop -= (e.deltaY || 0) * 0.25;
+          lastAction.textContent = `Drag scroll`;
+        });
+      }
+
+      function navigateTo(page) {
+        currentPage = page;
+        menuItems.forEach((item) => {
+          item.dataset.page === page ? item.classList.add("active") : item.classList.remove("active");
+        });
+        contentBodies.forEach((body) => {
+          body.dataset.page === page ? body.classList.add("active") : body.classList.remove("active");
+        });
+        lastAction.textContent = `Nav: ${page}`;
+      }
+
+      menuItems.forEach((item) => {
+        item.addEventListener("click", () => navigateTo(item.dataset.page));
+      });
+
+      actionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          button.classList.toggle("selected");
+          lastAction.textContent = button.dataset.action;
+        });
+      });
+
+      // Drag example
+      const draggableBoxes = document.querySelectorAll(".draggable-box");
+      const boxPos = {};
+      draggableBoxes.forEach((box) => {
+        const id = box.dataset.box;
+        boxPos[id] = { x: 0, y: 0 };
+        box.addEventListener("drag", (e) => {
+          box.classList.add("dragging");
+          boxPos[id].x += e.deltaX || 0;
+          boxPos[id].y += e.deltaY || 0;
+          box.style.left = boxPos[id].x + "px";
+          box.style.top = boxPos[id].y + "px";
+          lastAction.textContent = `Drag box ${id}`;
+        });
+        box.addEventListener("mouseup", () => box.classList.remove("dragging"));
+      });
+
+      backButton.addEventListener("click", () => navigateTo("home"));
+
+      document.addEventListener("beamng:trigger", (event) => {
+        const { id, action, duration, deltaX, deltaY } = event.detail;
+        lastAction.textContent = `Trigger: ${id} ${action}`;
+      });
+
+      document.addEventListener("beamng:trigger:click", (event) => {
+        if (event.detail.id === "acMax") {
+          lastAction.textContent = "Trigger: acMax clicked!";
+          
+          callVehicleLua("playSound", {});
+        }
+      });
+
+      // Required for BeamNG vehicle controller
+      window.setup = function (config) {};
+      window.updateData = function (data) {};
+      window.updateMode = function (data) {};
+    </script>
+  </body>
+</html>

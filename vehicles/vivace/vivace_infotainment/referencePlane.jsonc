@@ -1,0 +1,51 @@
+{
+  // Reference planes - define coordinate system origins for your triggers and boxes
+  // Think of them as arbitrary anchor points in 3D space - wherever you put one,
+  // that becomes (0, 0, 0) for anything using that plane's ID
+  // You can stick them anywhere! On screens, buttons, the console, whatever
+  "$configType": "referencePlane",
+
+  "planes": [
+    {
+      // Unique ID for this reference plane
+      // Triggers and boxes use this to say "hey, position me relative to THIS plane"
+      // Use descriptive names! "main_screen", "climate_buttons", etc.
+      "id": "0", // Leave blank if this is your only plane, otherwise "0" for the main one to prevent issues with defaults
+
+      // Position of this plane's origin in vehicle space (meters)
+      // This is where (0, 0, 0) will be for anything referencing this plane
+      "pos": {
+        "x": 0.16, // Left/right from vehicle center (positive = left)
+        "y": -0.215, // Forward/back (positive = towards rear)
+        "z": 0.7775 // Up/down from ground (positive = up)
+      },
+
+      // Rotation of the plane (degrees)
+      // Defines which way your local coordinate axes are pointing
+      // Play with these until your triggers line up properly!
+      "rot": {
+        "x": 87, // Pitch - tilts up/down (90° = vertical/facing forward)
+        "y": -10, // Yaw - rotates left/right
+        "z": 0 // Roll - tilts sideways (accounts for angled dash)
+      }
+    }
+
+    // Add more planes here! Just copy the structure above
+    // Each one gives you a fresh coordinate system to work with
+    /*
+    {
+      "id": "climate_panel",
+      "pos": {
+        "x": 0.0,
+        "y": -0.3,
+        "z": 0.65
+      },
+      "rot": {
+        "x": 85,
+        "y": 0,
+        "z": 0
+      }
+    }
+    */
+  ]
+}
