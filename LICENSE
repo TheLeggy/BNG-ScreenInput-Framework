@@ -1,59 +1,45 @@
-Development Preview License
+MIT License with Attribution and Compatibility Requirements
 
 Copyright (c) 2025 TheLeggy
 
-This software is provided as a DEVELOPMENT PREVIEW and is made available
-under the following terms:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Framework"), to deal
+in the Framework without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Framework, and to permit persons to whom the Framework is
+furnished to do so, subject to the following conditions:
 
-WHY THESE RESTRICTIONS:
-To ensure stability and prevent conflicts, this framework maintains a single
-canonical version. Allowing redistribution could lead to version fragmentation
-where multiple incompatible copies exist in the ecosystem, causing conflicts
-and compatibility issues (similar to "DLL hell"). By maintaining one official
-distribution channel, all users benefit from the same stable, tested version.
+ATTRIBUTION REQUIREMENT:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Framework. Additionally, any distribution
+of the Framework must include clear attribution to the original source at
+https://github.com/TheLeggy/BNG-ScreenInput-Framework/ and indicate if modifications have been made.
 
-DEVELOPMENT PREVIEW NOTICE:
-This software is currently in active development and is not yet ready for
-public release. The license terms may change when the software reaches a
-stable release version.
+COMPATIBILITY REQUIREMENT:
+If you redistribute modified versions of the Framework, you are responsible for
+ensuring that your modifications:
 
-PERMITTED USE:
+- Do not negatively interact with or interfere with the official distribution
+- Do not negatively interact with or interfere with other distributions
+- Do not create conflicts with other BeamNG mods or vehicles in the ecosystem
+- Do not break compatibility with vehicle mods designed to work with the
+  official Framework distribution
+- Are clearly identified as modified versions to prevent confusion with the
+  official distribution
 
-- You may download, view, and use this software locally for development,
-  testing, and evaluation purposes.
-- You may modify the software for your own personal, non-commercial use.
-- You may study the source code and learn from it.
-- You may develop and distribute your own projects, mods, or applications
-  that depend on or interface with this software, provided they do not
-  include or bundle the software itself.
-- You may require end-users to download this software separately from the
-  official distribution channel as a prerequisite for your projects.
+Redistributors should take reasonable steps to namespace, rename controller
+files, or otherwise isolate their modifications to prevent conflicts. You bear
+full responsibility for any issues, conflicts, or incompatibilities caused by
+your modifications in the BeamNG modding ecosystem.
 
-RESTRICTIONS:
+RECOMMENDED PRACTICES:
+To maintain ecosystem health, we strongly encourage (but do not require):
 
-- You may NOT redistribute this software in any form, modified or unmodified.
-- You may NOT package, bundle, or include this software (in whole or in part)
-  in any distributed projects, mods, or applications.
-- You may NOT publish, share, or make available any modifications or
-  derivative works of the core software itself.
-- You may NOT use this software in any commercial product or service.
-- You MUST direct end-users to obtain this software from the official
-  distribution channel.
-
-CONTRIBUTIONS:
-Contributions to this project are welcome and appreciated. By submitting a
-contribution (pull request, patch, suggestion, etc.), you agree that:
-
-- Your contribution may be included in the official distribution
-- You grant the copyright holder a perpetual, worldwide, royalty-free,
-  non-exclusive license to use, modify, and distribute your contribution
-  under these or future license terms
-- You retain copyright to your contribution
-- You warrant that you have the right to submit the contribution
-
-Issues, bug reports, and feature suggestions can be submitted through the
-project's official repository. All contributions will be reviewed and, if
-accepted, integrated into the canonical version.
+- Using a different mod/controller name for modified Framework versions
+- Maintaining compatibility with the official Framework's API and screen
+  service interfaces
+- Contributing improvements back to the official repository
+- Coordinating with the maintainers for significant changes
 
 NO WARRANTY:
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -63,8 +49,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-FUTURE LICENSING:
-The copyright holder reserves the right to release this software under
-different license terms in the future, including more permissive open source
-licenses once the project reaches a stable release.
