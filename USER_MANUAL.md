@@ -43,7 +43,7 @@ In the same jbeam part, add the screen configuration:
 ```json
 "your_screen_material": {
   "materialName": "@your_screen_material",
-  "htmlPath": "local://local/vehicles/yourcar/screens/infotainment.html",
+  "htmlPath": "local://local/vehicles/yourcar/interactive_screen/infotainment.html",
   "displayWidth": 1920,
   "displayHeight": 1080
 }
@@ -67,6 +67,8 @@ In your HTML file, add the screen input handler:
   window.initScreenInput(1920, 1080, "your_screen_material");
 </script>
 ```
+
+After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever and build it like you would for a tablet interface.
 
 The `screenId` parameter (third argument) should match your material name without the `@` symbol. This filters events so only raycasts hitting this specific screen trigger the display. Note that the material name in your jbeam configuration uses `@your_screen_material` with an `@`, but everywhere else (screenId in trigger boxes, JavaScript, screen configs) you use just `your_screen_material` without `@`.
 
@@ -245,6 +247,56 @@ Defines the resolution and aspect ratio for each screen material. This is used t
 ```
 
 **Note:** `"screenConfig"` is mandatory infrastructure. If you are not setting up screens, ask yourself: why do I need trigger boxes that work via JS? BeamNG already supports standard triggers that work via electrics and Lua. Consider those instead if you do not want to use a screen.
+
+---
+
+### Receiving Vehicle Data
+
+To get vehicle data (like speed, RPM, gear, etc.) into your HTML display, you use the standard BeamNG `displayData` pattern. This works the same way as any other HTML screen in BeamNG.
+
+**In your jbeam screen configuration, add displayData:**
+
+```json
+"your_screen_material": {
+  "materialName": "@your_screen_material",
+  "htmlPath": "local://local/vehicles/yourcar/interactive_screen//ns/infotainment.html",
+  "displayWidth": 1920,
+  "displayHeight": 1080,
+  "displayData": [
+    ["electrics", "values"],
+    ["customModules", "environmentData"],
+    ["powertrain", "deviceData"]
+  ]
+}
+```
+
+The `displayData` array specifies which data streams to send to your HTML. Common options include:
+
+- `["electrics", "values"]` - Electrics values
+- `["customModules", "environmentData"]` - Data from environmentData module
+- `["powertrain", "deviceData"]` - Values from the deviceData module
+
+**In your HTML, implement the callback functions:**
+
+```javascript
+// Called once with setup data
+window.setup = (setupData) => {};
+
+// Called continuously with live vehicle data
+window.updateData = (data) => {
+  // Access the data streams you requested
+  const speed = data.electrics.wheelspeed;
+  const rpm = data.electrics.rpm;
+  const gear = data.electrics.gear;
+  const temp = data.customModules.environmentData.temperatureEnv;
+
+  // Update your display
+  document.getElementById("speed").textContent = Math.round(speed);
+  document.getElementById("rpm").textContent = Math.round(rpm);
+};
+```
+
+**Important note:** This is standard BeamNG functionality and is not limited to the framework
 
 ---
 
@@ -808,6 +860,29 @@ function showPage(pageId) {
 - Does `screenId` match your material name (without `@`)?
 - Is the trigger box positioned correctly (enable debug visualization)?
 - Is the HTML display actually loading (check BeamNG console)?
+
+### Display looks stretched or cut off
+
+This is almost always a UV mapping issue on your 3D model, not the HTML, CEF, or this framework. HTML materials in BeamNG use UV coordinates to map the texture onto the mesh, so if your UVs are wonky, the display will also look wonky.
+
+**Quick diagnostic:**
+
+Create a simple test in your HTML with a perfect square:
+
+```html
+<div
+  style="width: 200px; height: 200px; background: red; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+></div>
+```
+
+If that square looks stretched, rectangular, or cut off, your UV map needs fixing. Go back to your 3D modeling software and check that the UV islands for your screen material are properly unwrapped and aligned. The UVs should form a clean rectangle with correct aspect ratio matching your screen resolution.
+
+**What to look for in your UV map:**
+
+- UV island should match the shape of your screen
+- Proportions should match your screen aspect ratio
+- Overlapping UVs
+- UVs should fill the 0-1 texture space
 
 ### Trigger boxes in wrong position
 

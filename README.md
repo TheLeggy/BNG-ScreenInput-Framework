@@ -138,7 +138,15 @@ In `vehicles/yourcar/interactive_screen/`, create:
 }
 ```
 
-### 3. Add JavaScript to Your HTML Display
+### 3. Include the ScreenInput Script
+
+Add the script tag to your HTML file:
+
+```html
+<script src="/ui/modules/screenInput.js"></script>
+```
+
+### 4. Add JavaScript to Your HTML Display
 
 // Add this to your HTML display
 
@@ -146,13 +154,12 @@ In `vehicles/yourcar/interactive_screen/`, create:
 window.initScreenInput(1920, 1080, "your_screen_material");
 ```
 
-Now your DOM elements receive standard browser events, such as:
+Your screen now responds to mouse input like any web interface would. The user manual also includes more useful information like troubleshooting, functions to communicate with the vehicle, etc.
+From this point forward, you're just writing normal web code. Your HTML elements receive real browser events, so use whatever JavaScript approach you're comfortable with.
 
 ```javascript
 document.getElementById("myButton").addEventListener("click", function (e) {});
 ```
-
-That's it. Your screen now responds to mouse input.
 
 ---
 
