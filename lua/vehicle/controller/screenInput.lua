@@ -12,6 +12,7 @@ local M = {}
 local gaugeHTMLTextures = {}
 local serviceExtension = ""
 local triggerConfigPath = ""
+local drawBoxes = false
 
 local playerSeated = false
 local driverNodeCid = 0
@@ -36,8 +37,9 @@ end
 local function onPlayersChanged(active)
     if active then
         obj:queueGameEngineLua([[
-            if ]]..serviceExtension..[[ then
-                ]]..serviceExtension..[[.setFocusCar(]]..objectId..[[)
+            if ]] .. serviceExtension .. [[ then
+                ]] .. serviceExtension .. [[.setFocusCar(]] .. objectId .. [[)
+                ]] .. serviceExtension .. [[.drawBoxes = ]] .. tostring(drawBoxes) .. [[
             end
         ]])
     end
@@ -64,8 +66,8 @@ local function initLastStage()
     end
 
     obj:queueGameEngineLua([[
-        if ]]..serviceExtension..[[ then
-            local basePath = "]]..triggerConfigPath..[["
+        if ]] .. serviceExtension .. [[ then
+            local basePath = "]] .. triggerConfigPath .. [["
             local files = FS:findFiles(basePath, "*.json", 0, true, false)
             local jsoncFiles = FS:findFiles(basePath, "*.jsonc", 0, true, false)
             
@@ -79,9 +81,9 @@ local function initLastStage()
                 local content = readFile(filepath)
                 if content and content:match('"$configType"%s*:%s*"triggerBoxes"') then
                     -- Load trigger boxes (screen interaction areas)
-                    ]]..serviceExtension..[[.loadBoxes(filepath)
+                    ]] .. serviceExtension .. [[.loadBoxes(filepath)
                     -- Load triggers (physical volumes) - searches same directory
-                    ]]..serviceExtension..[[.loadTriggers(filepath)
+                    ]] .. serviceExtension .. [[.loadTriggers(filepath)
                     break
                 end
             end
@@ -105,10 +107,10 @@ local function init(jbeamData)
         triggerConfigPath = "vehicles/" .. vehModel .. "/interactive_screen/"
     end
 
+    drawBoxes = jbeamData and jbeamData.drawBoxes or false
+
     -- Reload the screenService extension
-    obj:queueGameEngineLua([[
-        extensions.reload("screenService")
-    ]])
+    obj:queueGameEngineLua("extensions.reload('screenService')")
 
     driverNodeCid = beamstate.nodeNameMap["driver"] or 0
 end
@@ -128,7 +130,9 @@ M.inputCoordinate = inputCoordinate
 
 -- Hover state changes (mouse enter/leave trigger boxes)
 local function onHover(boxId)
-    callJS("screenInput.onHover", {boxId = boxId})
+    callJS("screenInput.onHover", {
+        boxId = boxId
+    })
 end
 
 M.onHover = onHover

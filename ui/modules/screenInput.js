@@ -21,7 +21,7 @@ class ScreenInputHandler {
     this.lastHoverElement = null;
     this.hoveredElements = [];
     this.lastMouseMoveTime = 0;
-    this.mouseMoveThrottle = 11; // 90fps (used to be 30, now 90 because overhead was minimal)
+    this.mouseMoveThrottle = 1; // was 11ms. throttled way less cause it seems to make no difference anyway?
   }
 
   getDownstreamChain(element) {

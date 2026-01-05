@@ -29,13 +29,15 @@ Add the controllers to your vehicle's jbeam file:
 "controller": [
   ["fileName"],
   ["screenInput", {
-    "triggerConfigPath": "vehicles/yourcar/screen_configs/"
+    "triggerConfigPath": "vehicles/yourcar/screen_configs/",
+    "drawBoxes": false
   }],
   ["newScreen", { "name": "your_screen_material" }]
 ]
 ```
 
 - `triggerConfigPath` - Path to configuration files (defaults to `vehicles/{model}/interactive_screen/`)
+- `drawBoxes` - Enable visualization of trigger boxes and reference planes (defaults to `false`)
 - `name` - Identifier for the screen controller
 
 In the same jbeam part, add the screen configuration:
@@ -176,7 +178,7 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
 
 **How sizing works:**
 
-The `scale` property sets the width, and the height is calculated automatically from your screen's aspect ratio (defined in `screenConfigs.jsonc`). For example, if your screen is 1920x1080 (16:9 aspect ratio) and scale is 0.2m, the box will be 0.2m wide and ~0.1125m tall.
+The `scale` property sets the width, and the height is calculated automatically from your screen's aspect ratio (from jbeam `displayWidth`/`displayHeight`). For example, if your screen is 1920x1080 (16:9 aspect ratio) and scale is 0.2m, the box will be 0.2m wide and ~0.1125m tall.
 
 ### Trigger Volumes (`"$configType": "triggers"`)
 
@@ -235,28 +237,6 @@ document.addEventListener("beamng:trigger:click", function (event) {
   }
 });
 ```
-
-### Screen Configurations (`"$configType": "screenConfig"`)
-
-Defines the resolution and aspect ratio for each screen material. This is used to calculate trigger box heights and convert normalized coordinates to pixels.
-
-**Header:** `"$configType": "screenConfig"`
-
-```jsonc
-{
-  "$configType": "screenConfig",
-  "your_screen_material": {
-    "width": 1920,
-    "height": 1080
-  },
-  "gauge_cluster": {
-    "width": 1280,
-    "height": 480
-  }
-}
-```
-
-**Note:** `"screenConfig"` is mandatory infrastructure. If you are not setting up screens, ask yourself: why do I need trigger boxes that work via JS? BeamNG already supports standard triggers that work via electrics and Lua. Consider those instead if you do not want to use a screen.
 
 ---
 
@@ -723,7 +703,7 @@ BeamNG uses the following coordinates (according to the gridmap, assuming defaul
 
 ### Reference Plane Visualization
 
-When debugging is enabled (`screenService.drawBoxes = true`), reference planes display:
+When debug visualization is enabled (`"drawBoxes": true` in jbeam), reference planes display:
 
 **Position axes (solid lines)** - Where the reference plane is located
 
@@ -805,7 +785,7 @@ Honestly, rotation is one of those things that just works if you follow the visu
 
 ### Debugging Visualizations
 
-The framework includes visual debugging for trigger boxes and reference planes. When enabled, you'll see:
+The framework includes visual debugging for trigger boxes and reference planes. Enable it by setting `"drawBoxes": true` in the screenInput controller configuration. When enabled, you'll see:
 
 **Colored boxes:**
 
@@ -829,10 +809,9 @@ This visualization is invaluable when positioning triggers. You can see exactly 
 
 You can have multiple interactive screens in the same vehicle. Each screen needs:
 
-1. Its own `newScreen` controller with unique material name
-2. An entry in `screenConfigs.jsonc` with its resolution
-3. Trigger boxes with matching `screenId` properties
-4. HTML displays that call `initScreenInput()` with matching screen IDs
+1. Its own `newScreen` controller with unique name and material
+2. Trigger boxes with matching `screenId` properties (use controller name)
+3. HTML displays that call `initScreenInput()` with matching screen IDs
 
 **Example:**
 

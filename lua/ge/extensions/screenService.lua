@@ -26,15 +26,19 @@ local screenConfigs = {}
 --------------------------------------------------------------------
 
 local function parseJSON(path)
-    if not path then return nil end
-    
+    if not path then
+        return nil
+    end
+
     local content = readFile(path)
-    if not content then return nil end
-    
+    if not content then
+        return nil
+    end
+
     -- Attempt to parse as JSON
     local success, result = pcall(jsonDecode, content)
     if not success then
-        log("E","Failed to parse JSON from " .. path .. ": " .. tostring(result))
+        log("E", "Failed to parse JSON from " .. path .. ": " .. tostring(result))
         return nil
     end
     return result
@@ -44,7 +48,7 @@ local function findFileBySchema(directory, schemaType)
     -- Find all JSON and JSONC files in directory
     local jsonFiles = FS:findFiles(directory, "*.json", 0, true, false)
     local jsoncFiles = FS:findFiles(directory, "*.jsonc", 0, true, false)
-    
+
     -- Check JSONC files first 
     -- If you check JSON first, JSONC is never read
     for _, filepath in ipairs(jsoncFiles) do
@@ -53,7 +57,7 @@ local function findFileBySchema(directory, schemaType)
             return filepath
         end
     end
-    
+
     -- Check JSON files
     for _, filepath in ipairs(jsonFiles) do
         local data = parseJSON(filepath)
@@ -61,7 +65,7 @@ local function findFileBySchema(directory, schemaType)
             return filepath
         end
     end
-    
+
     return nil
 end
 
@@ -75,24 +79,6 @@ local function configureScreen(screenId, config)
         height = config.height,
         aspectRatio = config.width / config.height
     }
-end
-
-local function loadScreenConfigs(path)
-    local configData = parseJSON(path)
-    if not configData then return end
-    
-    -- Schema check
-    local schema = configData["$configType"]
-    if schema and schema ~= "screenConfig" then
-        log("W","Expected $configType 'screenConfig', got '" .. tostring(schema) .. "' in " .. path)
-    end
-
-    -- Load each screen config (skip $configType metadata)
-    for screenId, config in pairs(configData) do
-        if screenId ~= "$configType" and type(config) == "table" then
-            configureScreen(screenId, config)
-        end
-    end
 end
 
 --------------------------------------------------------------------
@@ -138,8 +124,12 @@ local function detectMouseEvent()
         return "drag", 0, delta.x, delta.y
     end
 
-    if im.IsMouseClicked(0) then return "click", 0 end
-    if im.IsMouseReleased(0) then return "mouseup", 0 end
+    if im.IsMouseClicked(0) then
+        return "click", 0
+    end
+    if im.IsMouseReleased(0) then
+        return "mouseup", 0
+    end
 
     local mouseWheel = im.GetIO().MouseWheel
     if mouseWheel ~= 0 then
@@ -156,11 +146,13 @@ end
 --------------------------------------------------------------------
 
 local function sendCoordinateEvent(eventData)
-    if not vehicle then return end
+    if not vehicle then
+        return
+    end
 
     -- Send coordinate event to all screen controllers
     vehicle:queueLuaCommand([[
-        local eventData = lpack.decode("]]..lpack.encode(eventData)..[[")
+        local eventData = lpack.decode("]] .. lpack.encode(eventData) .. [[")
 
         -- Send to screenInput if it exists (forwards to all screens)
         if screenInput and screenInput.inputCoordinate then
@@ -170,21 +162,25 @@ local function sendCoordinateEvent(eventData)
 end
 
 local function sendHover(boxId)
-    if not vehicle then return end
-    
+    if not vehicle then
+        return
+    end
+
     vehicle:queueLuaCommand([[
         -- Send hover event to screenInput if it exists
         if screenInput and screenInput.onHover then
-            screenInput.onHover(]]..(boxId and ('"'..tostring(boxId)..'"') or 'nil')..[[)
+            screenInput.onHover(]] .. (boxId and ('"' .. tostring(boxId) .. '"') or 'nil') .. [[)
         end
     ]])
 end
 
 local function sendTriggerEvent(eventData)
-    if not vehicle then return end
-    
+    if not vehicle then
+        return
+    end
+
     vehicle:queueLuaCommand([[
-        local eventData = lpack.decode("]]..lpack.encode(eventData)..[[")
+        local eventData = lpack.decode("]] .. lpack.encode(eventData) .. [[")
         
         -- Send trigger event to screenInput if it exists
         if screenInput and screenInput.onTrigger then
@@ -195,34 +191,52 @@ end
 
 local function detectTriggerInteraction(triggerId)
     local im = ui_imgui
-    local state = triggerStates[triggerId] or {pressed = false, dragStart = nil}
+    local state = triggerStates[triggerId] or {
+        pressed = false,
+        dragStart = nil
+    }
     local eventData = nil
-    
+
     if im.IsMouseClicked(0) then
         state.pressed = true
         state.pressTime = os.clock()
         state.dragStart = im.GetMousePos()
         triggerStates[triggerId] = state
-        eventData = {id = triggerId, action = "press"}
-        
+        eventData = {
+            id = triggerId,
+            action = "press"
+        }
+
     elseif im.IsMouseReleased(0) and state.pressed then
         local pressDuration = os.clock() - (state.pressTime or 0)
         state.pressed = false
         triggerStates[triggerId] = state
-        
+
         if pressDuration > 0.5 then
-            eventData = {id = triggerId, action = "hold", duration = pressDuration}
+            eventData = {
+                id = triggerId,
+                action = "hold",
+                duration = pressDuration
+            }
         else
-            eventData = {id = triggerId, action = "click"}
+            eventData = {
+                id = triggerId,
+                action = "click"
+            }
         end
-        
+
     elseif im.IsMouseDragging(0) and state.pressed and state.dragStart then
         local delta = im.GetMouseDragDelta(0)
         if math.abs(delta.x) > 5 or math.abs(delta.y) > 5 then
-            eventData = {id = triggerId, action = "drag", deltaX = delta.x, deltaY = delta.y}
+            eventData = {
+                id = triggerId,
+                action = "drag",
+                deltaX = delta.x,
+                deltaY = delta.y
+            }
         end
     end
-    
+
     return eventData
 end
 
@@ -234,19 +248,20 @@ local function drawBox(box, color)
     local col = color or ColorF(0, 1, 1, 1)
     local center = box:getCenter()
     local halfExt = box:getHalfExtents()
-    local cornerA = center+halfExt.x*box:getAxis(0)+halfExt.y*box:getAxis(1)+halfExt.z*box:getAxis(2)
-    local cornerB = center+(-halfExt.x)*box:getAxis(0)+halfExt.y*box:getAxis(1)+halfExt.z*box:getAxis(2)
-    local cornerC = center+halfExt.x*box:getAxis(0)+(-halfExt.y)*box:getAxis(1)+halfExt.z*box:getAxis(2)
-    local cornerD = center+(-halfExt.x)*box:getAxis(0)+(-halfExt.y)*box:getAxis(1)+halfExt.z*box:getAxis(2)
+    local cornerA = center + halfExt.x * box:getAxis(0) + halfExt.y * box:getAxis(1) + halfExt.z * box:getAxis(2)
+    local cornerB = center + (-halfExt.x) * box:getAxis(0) + halfExt.y * box:getAxis(1) + halfExt.z * box:getAxis(2)
+    local cornerC = center + halfExt.x * box:getAxis(0) + (-halfExt.y) * box:getAxis(1) + halfExt.z * box:getAxis(2)
+    local cornerD = center + (-halfExt.x) * box:getAxis(0) + (-halfExt.y) * box:getAxis(1) + halfExt.z * box:getAxis(2)
     debugDrawer:drawLine(cornerA, cornerB, col)
     debugDrawer:drawLine(cornerA, cornerC, col)
     debugDrawer:drawLine(cornerC, cornerD, col)
     debugDrawer:drawLine(cornerD, cornerB, col)
 
-    local cornerE = center+halfExt.x*box:getAxis(0)+halfExt.y*box:getAxis(1)+(-halfExt.z)*box:getAxis(2)
-    local cornerF = center+(-halfExt.x)*box:getAxis(0)+halfExt.y*box:getAxis(1)+(-halfExt.z)*box:getAxis(2)
-    local cornerG = center+halfExt.x*box:getAxis(0)+(-halfExt.y)*box:getAxis(1)+(-halfExt.z)*box:getAxis(2)
-    local cornerH = center+(-halfExt.x)*box:getAxis(0)+(-halfExt.y)*box:getAxis(1)+(-halfExt.z)*box:getAxis(2)
+    local cornerE = center + halfExt.x * box:getAxis(0) + halfExt.y * box:getAxis(1) + (-halfExt.z) * box:getAxis(2)
+    local cornerF = center + (-halfExt.x) * box:getAxis(0) + halfExt.y * box:getAxis(1) + (-halfExt.z) * box:getAxis(2)
+    local cornerG = center + halfExt.x * box:getAxis(0) + (-halfExt.y) * box:getAxis(1) + (-halfExt.z) * box:getAxis(2)
+    local cornerH = center + (-halfExt.x) * box:getAxis(0) + (-halfExt.y) * box:getAxis(1) + (-halfExt.z) *
+                        box:getAxis(2)
     debugDrawer:drawLine(cornerE, cornerF, col)
     debugDrawer:drawLine(cornerE, cornerG, col)
     debugDrawer:drawLine(cornerG, cornerH, col)
@@ -264,8 +279,8 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
     local labelOffset = 0.015
     local arrowSize = 0.008
     local tickSize = 0.005
-    
-    -- Position axes are absolute - only relative to vehicle rotation, not plane rotation
+
+    -- Position axes are absolute
     local xAxis = vec3(1, 0, 0):rotated(vehRot)
     local yAxis = vec3(0, 1, 0):rotated(vehRot)
     local zAxis = vec3(0, 0, 1):rotated(vehRot)
@@ -274,10 +289,10 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
     local function drawAxisWithLabels(axis, color, axisName, axisLength)
         local posEnd = refPlanePos + axis * axisLength
         local negEnd = refPlanePos - axis * axisLength
-        
+
         -- Draw positive direction (solid line)
         debugDrawer:drawLine(refPlanePos, posEnd, color)
-        
+
         -- Draw negative direction (dashed)
         local negSegments = 8
         for i = 1, negSegments do
@@ -289,7 +304,7 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
                 debugDrawer:drawLine(p1, p2, ColorF(color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a))
             end
         end
-        
+
         -- Draw arrow at positive end
         local perp1 = vec3(0, 1, 0):rotated(vehRot)
         local dotProd = perp1.x * axis.x + perp1.y * axis.y + perp1.z * axis.z
@@ -297,12 +312,8 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
             perp1 = vec3(0, 0, 1):rotated(vehRot)
             dotProd = perp1.x * axis.x + perp1.y * axis.y + perp1.z * axis.z
         end
-        
-        local perp = vec3(
-            perp1.x - dotProd * axis.x,
-            perp1.y - dotProd * axis.y,
-            perp1.z - dotProd * axis.z
-        )
+
+        local perp = vec3(perp1.x - dotProd * axis.x, perp1.y - dotProd * axis.y, perp1.z - dotProd * axis.z)
         local perpLen = math.sqrt(perp.x * perp.x + perp.y * perp.y + perp.z * perp.z)
         if perpLen > 0.0001 then
             perp = vec3(perp.x / perpLen, perp.y / perpLen, perp.z / perpLen)
@@ -312,16 +323,13 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
         local arrowTip = posEnd
         local arrowBase = posEnd - axis * arrowSize
         local arrowOffset = perp * (arrowSize * 0.5)
-        
+
         debugDrawer:drawLine(arrowTip, arrowBase + arrowOffset, color)
         debugDrawer:drawLine(arrowTip, arrowBase - arrowOffset, color)
-        
+
         -- Compute second perpendicular vector
-        local perp2 = vec3(
-            axis.y * perp.z - axis.z * perp.y,
-            axis.z * perp.x - axis.x * perp.z,
-            axis.x * perp.y - axis.y * perp.x
-        )
+        local perp2 = vec3(axis.y * perp.z - axis.z * perp.y, axis.z * perp.x - axis.x * perp.z,
+            axis.x * perp.y - axis.y * perp.x)
         local perp2Len = math.sqrt(perp2.x * perp2.x + perp2.y * perp2.y + perp2.z * perp2.z)
         if perp2Len > 0.0001 then
             perp2 = vec3(perp2.x / perp2Len, perp2.y / perp2Len, perp2.z / perp2Len)
@@ -329,35 +337,37 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
             debugDrawer:drawLine(arrowTip, arrowBase + arrowOffset2, color)
             debugDrawer:drawLine(arrowTip, arrowBase - arrowOffset2, color)
         end
-        
+
         -- Draw tick marks at both ends
         local tickOffset = perp * tickSize
         local tick1 = posEnd + tickOffset
         local tick2 = posEnd - tickOffset
         debugDrawer:drawLine(tick1, tick2, color)
-        
+
         local tick3 = negEnd + tickOffset
         local tick4 = negEnd - tickOffset
         debugDrawer:drawLine(tick3, tick4, ColorF(color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a))
-        
+
         -- Draw text labels
         local labelPosPos = posEnd + axis * labelOffset
         local labelPosNeg = negEnd - axis * labelOffset
         if debugDrawer.drawText then
             debugDrawer:drawText(labelPosPos, axisName .. "+", color)
-            debugDrawer:drawText(labelPosNeg, axisName .. "-", ColorF(color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a))
+            debugDrawer:drawText(labelPosNeg, axisName .. "-",
+                ColorF(color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a))
         elseif debugDrawer.drawString then
             debugDrawer:drawString(labelPosPos, axisName .. "+", color)
-            debugDrawer:drawString(labelPosNeg, axisName .. "-", ColorF(color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a))
+            debugDrawer:drawString(labelPosNeg, axisName .. "-",
+                ColorF(color.r * 0.6, color.g * 0.6, color.b * 0.6, color.a))
         end
     end
-    
+
     -- Draw absolute position axes (relative to vehicle rotation only)
     -- These show where the reference plane is positioned in world space
     drawAxisWithLabels(xAxis, ColorF(1, 0, 0, 1), "X", axisLength)
     drawAxisWithLabels(yAxis, ColorF(0, 1, 0, 1), "Y", axisLength)
     drawAxisWithLabels(zAxis, ColorF(0, 0, 1, 1), "Z", axisLength)
-    
+
     -- Draw relative position axes (relative to reference plane rotation)
     -- These show the coordinate system used by trigger boxes with relative positions
     -- Use slightly shorter length and different style to distinguish from absolute axes
@@ -365,12 +375,12 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
     local relXAxis = vec3(1, 0, 0):rotated(combinedVehRefRot)
     local relYAxis = vec3(0, 1, 0):rotated(combinedVehRefRot)
     local relZAxis = vec3(0, 0, 1):rotated(combinedVehRefRot)
-    
+
     -- Draw relative axes with dashed lines and different colors to distinguish
     local function drawRelativeAxis(axis, color, axisName, axisLength)
         local posEnd = refPlanePos + axis * axisLength
         local negEnd = refPlanePos - axis * axisLength
-        
+
         -- Draw positive direction (dashed line)
         local posSegments = 8
         for i = 1, posSegments do
@@ -382,7 +392,7 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
                 debugDrawer:drawLine(p1, p2, color)
             end
         end
-        
+
         -- Draw negative direction (dotted)
         local negSegments = 8
         for i = 1, negSegments do
@@ -394,7 +404,7 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
                 debugDrawer:drawLine(p1, p2, ColorF(color.r * 0.5, color.g * 0.5, color.b * 0.5, color.a))
             end
         end
-        
+
         -- Draw arrow at positive end (smaller than absolute axes)
         local perp1 = vec3(0, 1, 0):rotated(combinedVehRefRot)
         local dotProd = perp1.x * axis.x + perp1.y * axis.y + perp1.z * axis.z
@@ -402,12 +412,8 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
             perp1 = vec3(0, 0, 1):rotated(combinedVehRefRot)
             dotProd = perp1.x * axis.x + perp1.y * axis.y + perp1.z * axis.z
         end
-        
-        local perp = vec3(
-            perp1.x - dotProd * axis.x,
-            perp1.y - dotProd * axis.y,
-            perp1.z - dotProd * axis.z
-        )
+
+        local perp = vec3(perp1.x - dotProd * axis.x, perp1.y - dotProd * axis.y, perp1.z - dotProd * axis.z)
         local perpLen = math.sqrt(perp.x * perp.x + perp.y * perp.y + perp.z * perp.z)
         if perpLen > 0.0001 then
             perp = vec3(perp.x / perpLen, perp.y / perpLen, perp.z / perpLen)
@@ -417,40 +423,42 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
         local arrowTip = posEnd
         local arrowBase = posEnd - axis * (arrowSize * 0.8)
         local arrowOffset = perp * (arrowSize * 0.4)
-        
+
         debugDrawer:drawLine(arrowTip, arrowBase + arrowOffset, color)
         debugDrawer:drawLine(arrowTip, arrowBase - arrowOffset, color)
-        
+
         -- Draw text labels with "rel" prefix
         local labelPosPos = posEnd + axis * labelOffset
         if debugDrawer.drawText then
-            debugDrawer:drawText(labelPosPos, axisName .. "+ (rel)", ColorF(color.r * 0.8, color.g * 0.8, color.b * 0.8, color.a))
+            debugDrawer:drawText(labelPosPos, axisName .. "+ (rel)",
+                ColorF(color.r * 0.8, color.g * 0.8, color.b * 0.8, color.a))
         elseif debugDrawer.drawString then
-            debugDrawer:drawString(labelPosPos, axisName .. "+ (rel)", ColorF(color.r * 0.8, color.g * 0.8, color.b * 0.8, color.a))
+            debugDrawer:drawString(labelPosPos, axisName .. "+ (rel)",
+                ColorF(color.r * 0.8, color.g * 0.8, color.b * 0.8, color.a))
         end
     end
-    
+
     -- Draw relative X axis (red, dashed)
     drawRelativeAxis(relXAxis, ColorF(1, 0.3, 0.3, 1), "X", relAxisLength)
-    
+
     -- Draw relative Y axis (green, dashed)
     drawRelativeAxis(relYAxis, ColorF(0.3, 1, 0.3, 1), "Y", relAxisLength)
-    
+
     -- Draw relative Z axis (blue, dashed)
     drawRelativeAxis(relZAxis, ColorF(0.3, 0.3, 1, 1), "Z", relAxisLength)
-    
+
     -- Draw rotation axes
     if planeRot then
         local rotAxisLength = axisLength * 0.8
         local rotRadius = rotAxisLength * 0.3
         local rotArrowSize = 0.006
         local rotCenter = refPlanePos
-        
+
         -- Rotation axes use combined rotation (vehicle + plane)
         local rotXAxis = vec3(1, 0, 0):rotated(combinedVehRefRot)
         local rotYAxis = vec3(0, 1, 0):rotated(combinedVehRefRot)
         local rotZAxis = vec3(0, 0, 1):rotated(combinedVehRefRot)
-        
+
         -- Helper function to draw rotation arc with arrow
         local function drawRotationArc(rotAxis, plane1, plane2, color, label, rotValue, reversed)
             -- Draw rotation arc (quarter circle)
@@ -458,20 +466,22 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
             for i = 1, arcSegments do
                 local angle1 = (i - 1) * (math.pi / 2) / arcSegments
                 local angle2 = i * (math.pi / 2) / arcSegments
-                
+
                 local dir1Vec = plane1 * math.cos(angle1) + plane2 * math.sin(angle1)
                 local dir1Len = math.sqrt(dir1Vec.x * dir1Vec.x + dir1Vec.y * dir1Vec.y + dir1Vec.z * dir1Vec.z)
-                local dir1 = dir1Len > 0.0001 and vec3(dir1Vec.x / dir1Len, dir1Vec.y / dir1Len, dir1Vec.z / dir1Len) or plane1
-                
+                local dir1 = dir1Len > 0.0001 and vec3(dir1Vec.x / dir1Len, dir1Vec.y / dir1Len, dir1Vec.z / dir1Len) or
+                                 plane1
+
                 local dir2Vec = plane1 * math.cos(angle2) + plane2 * math.sin(angle2)
                 local dir2Len = math.sqrt(dir2Vec.x * dir2Vec.x + dir2Vec.y * dir2Vec.y + dir2Vec.z * dir2Vec.z)
-                local dir2 = dir2Len > 0.0001 and vec3(dir2Vec.x / dir2Len, dir2Vec.y / dir2Len, dir2Vec.z / dir2Len) or plane1
-                
+                local dir2 = dir2Len > 0.0001 and vec3(dir2Vec.x / dir2Len, dir2Vec.y / dir2Len, dir2Vec.z / dir2Len) or
+                                 plane1
+
                 local p1 = rotCenter + dir1 * rotRadius
                 local p2 = rotCenter + dir2 * rotRadius
                 debugDrawer:drawLine(p1, p2, color)
             end
-            
+
             -- Draw arrow at tip or start of arc
             local arrowAngle = reversed and 0 or math.pi / 2
             local arrowPos = plane1 * math.cos(arrowAngle) + plane2 * math.sin(arrowAngle)
@@ -479,21 +489,19 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
             if arrowPosLen > 0.0001 then
                 arrowPos = vec3(arrowPos.x / arrowPosLen, arrowPos.y / arrowPosLen, arrowPos.z / arrowPosLen)
             end
-            
+
             local tangentDir = -plane1 * math.sin(arrowAngle) + plane2 * math.cos(arrowAngle)
-            local tangentLen = math.sqrt(tangentDir.x * tangentDir.x + tangentDir.y * tangentDir.y + tangentDir.z * tangentDir.z)
+            local tangentLen = math.sqrt(tangentDir.x * tangentDir.x + tangentDir.y * tangentDir.y + tangentDir.z *
+                                             tangentDir.z)
             if tangentLen > 0.0001 then
                 tangentDir = vec3(tangentDir.x / tangentLen, tangentDir.y / tangentLen, tangentDir.z / tangentLen)
             end
-            
+
             local arrowTip = rotCenter + arrowPos * rotRadius
             local arrowBase = arrowTip + (reversed and 1 or -1) * tangentDir * rotArrowSize
-            
-            local perp = vec3(
-                rotAxis.y * tangentDir.z - rotAxis.z * tangentDir.y,
-                rotAxis.z * tangentDir.x - rotAxis.x * tangentDir.z,
-                rotAxis.x * tangentDir.y - rotAxis.y * tangentDir.x
-            )
+
+            local perp = vec3(rotAxis.y * tangentDir.z - rotAxis.z * tangentDir.y,
+                rotAxis.z * tangentDir.x - rotAxis.x * tangentDir.z, rotAxis.x * tangentDir.y - rotAxis.y * tangentDir.x)
             local perpLen = math.sqrt(perp.x * perp.x + perp.y * perp.y + perp.z * perp.z)
             if perpLen > 0.0001 then
                 perp = vec3(perp.x / perpLen, perp.y / perpLen, perp.z / perpLen)
@@ -501,7 +509,7 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
                 debugDrawer:drawLine(arrowTip, arrowBase + arrowOffset, color)
                 debugDrawer:drawLine(arrowTip, arrowBase - arrowOffset, color)
             end
-            
+
             local labelAngle = math.pi / 4
             local labelDir = plane1 * math.cos(labelAngle) + plane2 * math.sin(labelAngle)
             local labelDirLen = math.sqrt(labelDir.x * labelDir.x + labelDir.y * labelDir.y + labelDir.z * labelDir.z)
@@ -509,33 +517,33 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
                 labelDir = vec3(labelDir.x / labelDirLen, labelDir.y / labelDirLen, labelDir.z / labelDirLen)
             end
             local labelPos = rotCenter + labelDir * (rotRadius * 1.3)
-            
+
             if debugDrawer.drawText then
                 debugDrawer:drawText(labelPos, label, color)
             elseif debugDrawer.drawString then
                 debugDrawer:drawString(labelPos, label, color)
             end
         end
-        
+
         -- Rotation around X axis (pitch) - Cyan
         if planeRot.x then
             local rotXCol = ColorF(0, 1, 1, 0.8)
             drawRotationArc(rotXAxis, rotZAxis, rotYAxis, rotXCol, "RX", planeRot.x, false)
         end
-        
+
         -- Rotation around Y axis (yaw) - Yellow
         if planeRot.y then
             local rotYCol = ColorF(1, 1, 0, 0.8)
             drawRotationArc(rotYAxis, rotZAxis, rotXAxis, rotYCol, "RY", planeRot.y, true)
         end
-        
+
         -- Rotation around Z axis (roll) - Magenta
         if planeRot.z then
             local rotZCol = ColorF(1, 0, 1, 0.8)
             drawRotationArc(rotZAxis, rotYAxis, rotXAxis, rotZCol, "RZ", planeRot.z, true)
         end
     end
-    
+
     -- Draw reference plane outline 
     local halfSize = 0.1
     local refXAxis = vec3(1, 0, 0):rotated(combinedVehRefRot)
@@ -544,7 +552,7 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
     local corner2 = refPlanePos + (-refXAxis) * halfSize + refYAxis * halfSize
     local corner3 = refPlanePos + (-refXAxis) * halfSize + (-refYAxis) * halfSize
     local corner4 = refPlanePos + refXAxis * halfSize + (-refYAxis) * halfSize
-    
+
     debugDrawer:drawLine(corner1, corner2, col)
     debugDrawer:drawLine(corner2, corner3, col)
     debugDrawer:drawLine(corner3, corner4, col)
@@ -559,7 +567,7 @@ local function getReferencePlane(planeId)
     if not referencePlanes or not next(referencePlanes) then
         return nil
     end
-    
+
     local planeIdStr = planeId and tostring(planeId) or "0"
     return referencePlanes[planeIdStr] or referencePlanes["0"]
 end
@@ -569,16 +577,18 @@ end
 --------------------------------------------------------------------
 
 local function onUpdate(dt)
-    if not vehicle or not vehicle.getPosition or not boxes[1] then return end
+    if not vehicle or not vehicle.getPosition or not boxes[1] then
+        return
+    end
     local ray = getCameraMouseRay()
 
     local matFromRot = vehicle:getRefNodeMatrix()
     local vehRot = quat(vehicle:getRefNodeMatrix():toQuatF())
     local vehPos = vehicle:getPosition()
-    
+
     -- Cache rotation matrices per reference plane to avoid redundant calculations
     local refPlaneCache = {}
-    
+
     -- Draw reference planes if debug enabled
     if M.drawBoxes and referencePlanes and next(referencePlanes) then
         for planeId, plane in pairs(referencePlanes) do
@@ -603,21 +613,37 @@ local function onUpdate(dt)
             drawReferencePlane(refPlanePosOffset, combinedVehRefRot, plane.rot, vehRot)
         end
     end
-    
+
     local currentHoveredBoxId = nil
-    
+
     for k = 1, #boxes do
         local v = boxes[k]
+        if not v.sizeCalculated and v.scale then
+            local screenConfig = screenConfigs[v.screenId]
+            if screenConfig then
+                v.size = vec3(v.scale, v.depth, v.scale / screenConfig.aspectRatio)
+                v.sizeCalculated = true
+                v.scale = nil
+                v.depth = nil
+            else
+                goto continue
+            end
+        end
+
+        if not v.size then
+            goto continue
+        end
+
         local obb = OrientedBox3F()
 
         local refPlane = getReferencePlane(v.refPlane)
         local boxMat = MatrixF(true)
-        
+
         if refPlane then
             -- Use cached rotation matrices for this reference plane
             local cacheKey = v.refPlane or "default"
             local cached = refPlaneCache[cacheKey]
-            
+
             if not cached then
                 local refPlaneRotMat = MatrixF(true)
                 -- Use extrinsic rotations (independent axes)
@@ -631,12 +657,12 @@ local function onUpdate(dt)
                 refPlaneRotMat = rotX:copy()
                 refPlaneRotMat:mul(rotY)
                 refPlaneRotMat:mul(rotZ)
-                
+
                 local combinedVehRefRotMat = matFromRot:copy()
                 combinedVehRefRotMat:mul(refPlaneRotMat)
                 local combinedVehRefRot = quat(combinedVehRefRotMat:toQuatF())
                 local refPlanePosOffset = vehPos + refPlane.pos:rotated(vehRot)
-                
+
                 cached = {
                     combinedVehRefRotMat = combinedVehRefRotMat,
                     combinedVehRefRot = combinedVehRefRot,
@@ -644,11 +670,11 @@ local function onUpdate(dt)
                 }
                 refPlaneCache[cacheKey] = cached
             end
-            
+
             local combinedVehRefRotMat = cached.combinedVehRefRotMat
             local combinedVehRefRot = cached.combinedVehRefRot
             local refPlanePosOffset = cached.refPlanePosOffset
-            
+
             if v.rot then
                 local localRotMat = MatrixF(true)
                 -- Use extrinsic rotations (independent axes)
@@ -707,13 +733,14 @@ local function onUpdate(dt)
         end
 
         local halfExt = obb:getHalfExtents()
-        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenter(), halfExt.x * obb:getAxis(0), halfExt.y * obb:getAxis(1), halfExt.z * obb:getAxis(2))
-        
+        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenter(), halfExt.x * obb:getAxis(0),
+            halfExt.y * obb:getAxis(1), halfExt.z * obb:getAxis(2))
+
         if dist < 2 then
             local screenConfig = screenConfigs[v.screenId]
             if screenConfig then
                 currentHoveredBoxId = v.id
-                
+
                 local rayHitPos = ray.pos + ray.dir * dist
                 local coords = calculateScreenCoordinates(rayHitPos, obb)
                 local eventType, button, deltaX, deltaY = detectMouseEvent()
@@ -725,23 +752,27 @@ local function onUpdate(dt)
                     screenId = v.screenId
                 }
 
-                if button then eventData.button = button end
-                if deltaX then eventData.deltaX, eventData.deltaY = deltaX, deltaY end
-                
+                if button then
+                    eventData.button = button
+                end
+                if deltaX then
+                    eventData.deltaX, eventData.deltaY = deltaX, deltaY
+                end
+
                 if eventType == "wheel" and deltaX then
-                    eventData.deltaY = deltaX * -100 
+                    eventData.deltaY = deltaX * -100
                     eventData.deltaX = nil
                 end
 
-                eventData.pixelX, eventData.pixelY = normalizedToPixel(
-                    coords.x, coords.y, screenConfig.width, screenConfig.height
-                )
+                eventData.pixelX, eventData.pixelY = normalizedToPixel(coords.x, coords.y, screenConfig.width,
+                    screenConfig.height)
 
                 sendCoordinateEvent(eventData)
             end
         end
+        ::continue::
     end
-    
+
     -- Process triggers
     for k = 1, #triggers do
         local v = triggers[k]
@@ -749,12 +780,12 @@ local function onUpdate(dt)
 
         local refPlane = getReferencePlane(v.refPlane)
         local boxMat = MatrixF(true)
-        
+
         if refPlane then
             -- Use cached rotation matrices for this reference plane
             local cacheKey = v.refPlane or "default"
             local cached = refPlaneCache[cacheKey]
-            
+
             if not cached then
                 local refPlaneRotMat = MatrixF(true)
                 -- Use extrinsic rotations (independent axes)
@@ -768,12 +799,12 @@ local function onUpdate(dt)
                 refPlaneRotMat = rotX:copy()
                 refPlaneRotMat:mul(rotY)
                 refPlaneRotMat:mul(rotZ)
-                
+
                 local combinedVehRefRotMat = matFromRot:copy()
                 combinedVehRefRotMat:mul(refPlaneRotMat)
                 local combinedVehRefRot = quat(combinedVehRefRotMat:toQuatF())
                 local refPlanePosOffset = vehPos + refPlane.pos:rotated(vehRot)
-                
+
                 cached = {
                     combinedVehRefRotMat = combinedVehRefRotMat,
                     combinedVehRefRot = combinedVehRefRot,
@@ -781,11 +812,11 @@ local function onUpdate(dt)
                 }
                 refPlaneCache[cacheKey] = cached
             end
-            
+
             local combinedVehRefRotMat = cached.combinedVehRefRotMat
             local combinedVehRefRot = cached.combinedVehRefRot
             local refPlanePosOffset = cached.refPlanePosOffset
-            
+
             if v.rot then
                 local localRotMat = MatrixF(true)
                 -- Use extrinsic rotations (independent axes)
@@ -840,8 +871,9 @@ local function onUpdate(dt)
         end
 
         local halfExt = obb:getHalfExtents()
-        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenter(), halfExt.x * obb:getAxis(0), halfExt.y * obb:getAxis(1), halfExt.z * obb:getAxis(2))
-        
+        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenter(), halfExt.x * obb:getAxis(0),
+            halfExt.y * obb:getAxis(1), halfExt.z * obb:getAxis(2))
+
         if dist < 2 and v.id then
             local eventData = detectTriggerInteraction(v.id)
             if eventData then
@@ -849,7 +881,7 @@ local function onUpdate(dt)
             end
         end
     end
-    
+
     -- Handle hover state changes
     if currentHoveredBoxId ~= lastHoveredBoxId then
         if lastHoveredBoxId then
@@ -869,24 +901,32 @@ end
 local function parsePlaneData(planeData, filePath)
     local plane = {
         pos = vec3(0, 0, 0),
-        rot = {x = 0, y = 0, z = 0}
+        rot = {
+            x = 0,
+            y = 0,
+            z = 0
+        }
     }
-    
+
     if planeData.pos and planeData.pos.x and planeData.pos.y and planeData.pos.z then
         plane.pos = vec3(planeData.pos.x, planeData.pos.y, planeData.pos.z)
     end
-    
+
     -- Use default rotation if missing
     if not planeData.rot or not planeData.rot.x or not planeData.rot.y or not planeData.rot.z then
-        planeData.rot = {x = 0, y = 0, z = 0}
+        planeData.rot = {
+            x = 0,
+            y = 0,
+            z = 0
+        }
     end
-    
+
     plane.rot = {
         x = planeData.rot.x,
         y = planeData.rot.y,
         z = planeData.rot.z
     }
-    
+
     return plane
 end
 
@@ -896,11 +936,11 @@ local function loadBoxes(path)
         boxes = {}
         return
     end
-    
+
     -- Config type check
     local schema = fileData["$configType"]
     if schema and schema ~= "triggerBoxes" then
-        log("E","Expected $configType 'triggerBoxes', got '" .. tostring(schema) .. "' in " .. path)
+        log("E", "Expected $configType 'triggerBoxes', got '" .. tostring(schema) .. "' in " .. path)
     end
 
     -- Both formats supported: {"boxes": [...]} or direct array [...]
@@ -909,11 +949,11 @@ local function loadBoxes(path)
     elseif fileData[1] then
         boxes = fileData
     else
-        log("E","Invalid trigger box file format in " .. path)
+        log("E", "Invalid trigger box file format in " .. path)
         boxes = {}
         return
     end
-    
+
     -- Load reference planes
     referencePlanes = {}
     if path then
@@ -925,16 +965,17 @@ local function loadBoxes(path)
             -- Config type check
             local schema = refPlaneData["$configType"]
             if schema and schema ~= "referencePlane" then
-                log("W","Expected $configType 'referencePlane', got '" .. tostring(schema) .. "' in " .. refPlanePath)
+                log("W", "Expected $configType 'referencePlane', got '" .. tostring(schema) .. "' in " .. refPlanePath)
             end
-            
+
             -- Remove $configType metadata before processing
             refPlaneData["$configType"] = nil
-            
+
             -- Check for nested "planes" array
             if refPlaneData.planes then
                 for i = 1, #refPlaneData.planes do
-                    local planeIdStr = refPlaneData.planes[i].id and tostring(refPlaneData.planes[i].id) or tostring(i - 1)
+                    local planeIdStr = refPlaneData.planes[i].id and tostring(refPlaneData.planes[i].id) or
+                                           tostring(i - 1)
                     referencePlanes[planeIdStr] = parsePlaneData(refPlaneData.planes[i], refPlanePath)
                 end
             elseif refPlaneData.pos or refPlaneData.rot then
@@ -943,18 +984,7 @@ local function loadBoxes(path)
             end
         end
     end
-    
-    -- Load screen configs
-    if path then
-        local basePath = path:match("^(.+)/[^/]+$")
-        if basePath then
-            local configPath = findFileBySchema(basePath, "screenConfig")
-            if configPath then
-                loadScreenConfigs(configPath)
-            end
-        end
-    end
-    
+
     -- Clean and process boxes
     local cleaned = {}
     for k = 1, #boxes do
@@ -966,31 +996,34 @@ local function loadBoxes(path)
                 screenId = v.screenId,
                 refPlane = v.refPlane and tostring(v.refPlane) or nil
             }
-            
-            -- Determine size: either from scale+screenId (screen) or direct size (trigger)
+
             if v.screenId and v.scale then
-                local screenConfig = screenConfigs[v.screenId]
-                if not screenConfig then
-                    log("E","No screen config found for screenId: " .. v.screenId)
-                    box = nil
-                else
-                    local depth = v.depth or 0.0005
-                    box.size = vec3(v.scale, depth, v.scale / screenConfig.aspectRatio)
-                end
+                box.scale = v.scale
+                box.depth = v.depth or 0.0005
+                box.sizeCalculated = false
             elseif v.size and v.size.x and v.size.y and v.size.z then
                 box.size = vec3(v.size.x, v.size.y, v.size.z)
+                box.sizeCalculated = true
             else
-                log("E","Box " .. k .. " missing size data (needs 'screenId'+'scale' or 'size')")
+                log("E", "Box " .. k .. " missing size data (needs 'screenId'+'scale' or 'size')")
                 box = nil
             end
-            
+
             if box then
                 -- Use default rotation if missing
                 if not v.rot or not v.rot.x or not v.rot.y or not v.rot.z then
-                    v.rot = {x = 0, y = 0, z = 0}
+                    v.rot = {
+                        x = 0,
+                        y = 0,
+                        z = 0
+                    }
                 end
-                
-                box.rot = {x = v.rot.x, y = v.rot.y, z = v.rot.z}
+
+                box.rot = {
+                    x = v.rot.x,
+                    y = v.rot.y,
+                    z = v.rot.z
+                }
                 cleaned[#cleaned + 1] = box
             end
         end
@@ -1003,40 +1036,40 @@ local function loadTriggers(path)
         triggers = {}
         return
     end
-    
+
     local basePath = path:match("^(.+)/[^/]+$")
     if not basePath then
         triggers = {}
         return
     end
-    
+
     local triggerPath = findFileBySchema(basePath, "triggers")
     if not triggerPath then
         triggers = {}
         return
     end
-    
+
     local fileData = parseJSON(triggerPath)
     if not fileData then
         triggers = {}
         return
     end
-    
+
     local schema = fileData["$configType"]
     if schema and schema ~= "triggers" then
-        log("W","Expected $configType 'triggers', got '" .. tostring(schema) .. "' in " .. triggerPath)
+        log("W", "Expected $configType 'triggers', got '" .. tostring(schema) .. "' in " .. triggerPath)
     end
-    
+
     if fileData.triggers then
         triggers = fileData.triggers
     elseif fileData[1] then
         triggers = fileData
     else
-        log("E","Invalid trigger file format in " .. triggerPath)
+        log("E", "Invalid trigger file format in " .. triggerPath)
         triggers = {}
         return
     end
-    
+
     local cleaned = {}
     for k = 1, #triggers do
         local v = triggers[k]
@@ -1047,13 +1080,21 @@ local function loadTriggers(path)
                 id = v.id and tostring(v.id) or nil,
                 refPlane = v.refPlane and tostring(v.refPlane) or nil
             }
-            
+
             -- Use default rotation if missing
             if not v.rot or not v.rot.x or not v.rot.y or not v.rot.z then
-                v.rot = {x = 0, y = 0, z = 0}
+                v.rot = {
+                    x = 0,
+                    y = 0,
+                    z = 0
+                }
             end
-            
-            trigger.rot = {x = v.rot.x, y = v.rot.y, z = v.rot.z}
+
+            trigger.rot = {
+                x = v.rot.x,
+                y = v.rot.y,
+                z = v.rot.z
+            }
             cleaned[#cleaned + 1] = trigger
         end
     end
@@ -1099,18 +1140,24 @@ end
 
 -- Clean strings for file paths
 local function sanitizePathComponent(str)
-    if not str or str == "" then return "_default" end
+    if not str or str == "" then
+        return "_default"
+    end
     local sanitized = str:gsub("[<>:\"/\\|?*%c]", "_")
     sanitized = sanitized:match("^%s*(.-)%s*$")
     if #sanitized > 64 then
         sanitized = sanitized:sub(1, 64)
     end
-    if sanitized == "" then return "_default" end
+    if sanitized == "" then
+        return "_default"
+    end
     return sanitized
 end
 
 local function getLicensePlate()
-    if not vehicle then return nil end
+    if not vehicle then
+        return nil
+    end
     local licensePlate = vehicle.licenseText
     if licensePlate and licensePlate ~= "" then
         return sanitizePathComponent(licensePlate)
@@ -1119,27 +1166,31 @@ local function getLicensePlate()
 end
 
 local function getLicensePlateAsync(callbackId)
-    if not vehicle then return end
+    if not vehicle then
+        return
+    end
 
     local plate = getLicensePlate()
     local packedData = lpack.encode(plate)
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
-            screenInput.onPersistCallback("plate", "]]..callbackId..[[", "]]..packedData..[[")
+            screenInput.onPersistCallback("plate", "]] .. callbackId .. [[", "]] .. packedData .. [[")
         end
     ]])
 end
 
 -- Build file path based on scope
 local function buildPersistPath(filename, scope, userId, identifier)
-    if not vehicle then return nil, nil end
+    if not vehicle then
+        return nil, nil
+    end
 
     local vehicleModel = vehicle.jbeam or "unknown"
     local baseDir = "settings/persist/" .. vehicleModel
-    
+
     scope = scope or "global"
-    
+
     if scope == "factory" then
         local dir = baseDir .. "/_factory"
         return dir .. "/" .. filename .. ".json", dir
@@ -1150,7 +1201,7 @@ local function buildPersistPath(filename, scope, userId, identifier)
     elseif scope == "identifier" then
         local id = identifier or getLicensePlate()
         if not id then
-            log("W","No identifier or license plate found, returning to global scope")
+            log("W", "No identifier or license plate found, returning to global scope")
             return baseDir .. "/" .. filename .. ".json", baseDir
         end
         local sanitizedId = sanitizePathComponent(id)
@@ -1160,7 +1211,7 @@ local function buildPersistPath(filename, scope, userId, identifier)
     elseif scope == "user" then
         local id = identifier or getLicensePlate()
         if not id then
-            log("W","No identifier or license plate found, returning to global scope")
+            log("W", "No identifier or license plate found, returning to global scope")
             return baseDir .. "/" .. filename .. ".json", baseDir
         end
         local sanitizedId = sanitizePathComponent(id)
@@ -1168,7 +1219,7 @@ local function buildPersistPath(filename, scope, userId, identifier)
         local dir = baseDir .. "/" .. sanitizedId .. "/user/" .. sanitizedUserId
         return dir .. "/" .. filename .. ".json", dir
     else
-        log("W","Unknown scope '" .. tostring(scope) .. "', using global")
+        log("W", "Unknown scope '" .. tostring(scope) .. "', using global")
         return baseDir .. "/" .. filename .. ".json", baseDir
     end
 end
@@ -1181,9 +1232,9 @@ local function deepMerge(base, source)
     if type(source) ~= "table" then
         return source
     end
-    
+
     local result = {}
-    
+
     for k, v in pairs(base) do
         if type(v) == "table" then
             result[k] = deepMerge({}, v)
@@ -1191,7 +1242,7 @@ local function deepMerge(base, source)
             result[k] = v
         end
     end
-    
+
     for k, v in pairs(source) do
         if type(v) == "table" and type(result[k]) == "table" then
             result[k] = deepMerge(result[k], v)
@@ -1199,20 +1250,20 @@ local function deepMerge(base, source)
             result[k] = v
         end
     end
-    
+
     return result
 end
 
 -- Save data
 local function persistSave(filename, data, scope, userId, identifier)
     if not vehicle then
-        log("E","Cannot save data - no vehicle active")
+        log("E", "Cannot save data - no vehicle active")
         return false
     end
 
     local filePath, dir = buildPersistPath(filename, scope, userId, identifier)
     if not filePath then
-        log("E","Cannot build data path")
+        log("E", "Cannot build data path")
         return false
     end
 
@@ -1225,13 +1276,13 @@ end
 -- Load data
 local function persistLoad(filename, scope, userId, identifier)
     if not vehicle then
-        log("E","Cannot load data - no vehicle active")
+        log("E", "Cannot load data - no vehicle active")
         return nil
     end
 
     local filePath = buildPersistPath(filename, scope, userId, identifier)
     if not filePath then
-        log("E","Cannot build data path")
+        log("E", "Cannot build data path")
         return nil
     end
 
@@ -1242,7 +1293,7 @@ end
 -- Load data asynchronously with callback
 local function persistLoadAsync(filename, scope, userId, identifier, callbackId)
     if not vehicle then
-        log("W","Cannot load data - no vehicle active")
+        log("W", "Cannot load data - no vehicle active")
         return
     end
 
@@ -1252,44 +1303,52 @@ local function persistLoadAsync(filename, scope, userId, identifier, callbackId)
     local packedData = lpack.encode(data)
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistLoaded then
-            screenInput.onPersistLoaded("]]..callbackId..[[", "]]..packedData..[[")
+            screenInput.onPersistLoaded("]] .. callbackId .. [[", "]] .. packedData .. [[")
         end
     ]])
 
 end
 
 local function persistExists(filename, scope, userId, identifier)
-    if not vehicle then return false end
+    if not vehicle then
+        return false
+    end
     local filePath = buildPersistPath(filename, scope, userId, identifier)
-    if not filePath then return false end
+    if not filePath then
+        return false
+    end
     return FS:fileExists(filePath)
 end
 
 local function persistExistsAsync(filename, scope, userId, identifier, callbackId)
-    if not vehicle then return end
+    if not vehicle then
+        return
+    end
 
     local exists = persistExists(filename, scope, userId, identifier)
     local packedData = lpack.encode(exists)
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
-            screenInput.onPersistCallback("exists", "]]..callbackId..[[", "]]..packedData..[[")
+            screenInput.onPersistCallback("exists", "]] .. callbackId .. [[", "]] .. packedData .. [[")
         end
     ]])
 end
 
 local function persistDelete(filename, scope, userId, identifier)
     if not vehicle then
-        log("E","Cannot delete data - no vehicle active")
+        log("E", "Cannot delete data - no vehicle active")
         return false
     end
 
     local filePath = buildPersistPath(filename, scope, userId, identifier)
-    if not filePath then return false end
+    if not filePath then
+        return false
+    end
 
     if FS:fileExists(filePath) then
         FS:removeFile(filePath)
-        log("I","Deleted: " .. filePath)
+        log("I", "Deleted: " .. filePath)
         return true
     end
     return false
@@ -1297,11 +1356,15 @@ end
 
 -- List all user IDs with saved data for this file
 local function persistListUsers(filename, identifier)
-    if not vehicle then return {} end
+    if not vehicle then
+        return {}
+    end
 
     local vehicleModel = vehicle.jbeam or "unknown"
     local id = identifier or getLicensePlate()
-    if not id then return {} end
+    if not id then
+        return {}
+    end
 
     local sanitizedId = sanitizePathComponent(id)
     local userDir = "settings/persist/" .. vehicleModel .. "/" .. sanitizedId .. "/user"
@@ -1324,14 +1387,16 @@ local function persistListUsers(filename, identifier)
 end
 
 local function persistListUsersAsync(filename, identifier, callbackId)
-    if not vehicle then return end
+    if not vehicle then
+        return
+    end
 
     local users = persistListUsers(filename, identifier)
     local packedData = lpack.encode(users)
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
-            screenInput.onPersistCallback("users", "]]..callbackId..[[", "]]..packedData..[[")
+            screenInput.onPersistCallback("users", "]] .. callbackId .. [[", "]] .. packedData .. [[")
         end
     ]])
 end
@@ -1349,20 +1414,24 @@ local function persistRegisterDefaults(filename, defaults)
 end
 
 local function persistInitDefaults(filename, defaults)
-    if not vehicle then return false end
+    if not vehicle then
+        return false
+    end
 
     local filePath, dir = buildPersistPath(filename, "factory")
-    if not filePath then return false end
+    if not filePath then
+        return false
+    end
 
     if FS:fileExists(filePath) then
-        log("W","Factory defaults already exist: " .. filePath)
+        log("W", "Factory defaults already exist: " .. filePath)
         return true
     end
 
     local defaultData = defaults or factoryDefaults[filename] or {}
 
     if not next(defaultData) then
-        log("W","No defaults provided for factory file: " .. filename)
+        log("W", "No defaults provided for factory file: " .. filename)
         return false
     end
 
@@ -1375,7 +1444,7 @@ end
 -- Reset scope to factory defaults
 local function persistResetToFactory(filename, scope, userId, identifier)
     if scope == "factory" then
-        log("E","Cannot reset factory scope")
+        log("E", "Cannot reset factory scope")
         return false
     end
     return persistDelete(filename, scope, userId, identifier)
@@ -1405,26 +1474,26 @@ local function persistCopyPreset(sourcePath, filename, targetScope, overwrite, u
 
     -- Check if source file exists
     if not FS:fileExists(fullSourcePath) then
-         log("E","Preset file not found: " .. fullSourcePath)
+        log("E", "Preset file not found: " .. fullSourcePath)
         return false
     end
 
     -- Read and validate source file
     local presetData = parseJSON(fullSourcePath)
     if not presetData then
-         log("E","Failed to parse preset file: " .. fullSourcePath)
+        log("E", "Failed to parse preset file: " .. fullSourcePath)
         return false
     end
 
     -- Check if target already exists
     local targetPath, targetDir = buildPersistPath(filename, targetScope, userId, identifier)
     if not targetPath then
-         log("E","Cannot build target path for scope: " .. tostring(targetScope))
+        log("E", "Cannot build target path for scope: " .. tostring(targetScope))
         return false
     end
 
     if FS:fileExists(targetPath) and not (overwrite == true) then
-         log("W","Target file already exists (use overwrite=true to replace): " .. targetPath)
+        log("W", "Target file already exists (use overwrite=true to replace): " .. targetPath)
         return false
     end
 
@@ -1436,7 +1505,7 @@ local function persistCopyPreset(sourcePath, filename, targetScope, overwrite, u
     if success then
         return true
     else
-         log("E","Failed to write preset to: " .. targetPath)
+        log("E", "Failed to write preset to: " .. targetPath)
         return false
     end
 end
@@ -1507,7 +1576,8 @@ local function persistLoadMerged(filename, userId, identifier, callbackId)
         local packedSources = lpack.encode(sources)
         vehicle:queueLuaCommand([[
             if screenInput and screenInput.onPersistMerged then
-                screenInput.onPersistMerged("]]..callbackId..[[", "]]..packedData..[[", "]]..packedSources..[[")
+                screenInput.onPersistMerged("]] .. callbackId .. [[", "]] .. packedData .. [[", "]] .. packedSources ..
+                                    [[")
             end
         ]])
     end
@@ -1529,14 +1599,16 @@ local function persistGetSource(filename, key, userId, identifier)
 end
 
 local function persistGetSourceAsync(filename, key, userId, identifier, callbackId)
-    if not vehicle then return end
+    if not vehicle then
+        return
+    end
 
     local source = persistGetSource(filename, key, userId, identifier)
     local packedData = lpack.encode(source)
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
-            screenInput.onPersistCallback("source", "]]..callbackId..[[", "]]..packedData..[[")
+            screenInput.onPersistCallback("source", "]] .. callbackId .. [[", "]] .. packedData .. [[")
         end
     ]])
 end
@@ -1647,7 +1719,7 @@ M.setFocusCar = setFocusCar
 M.loadBoxes = loadBoxes
 M.loadTriggers = loadTriggers
 M.onVehicleDestroyed = onVehicleDestroyed
-M.configureScreen = configureScreen  -- Allow vehicle controllers to register screen configs
+M.configureScreen = configureScreen -- Allow vehicle controllers to register screen configs
 
 -- Data Persistence
 M.persistSave = persistSave
@@ -1672,14 +1744,13 @@ M.persistFindInHierarchy = persistFindInHierarchy
 M.persistCopyPreset = persistCopyPreset
 
 local function callVehicleLua(functionName, args)
-    if not vehicle then return end
-    
+    if not vehicle then
+        return
+    end
+
     local argsStr = lpack.encode(args)
-    vehicle:queueLuaCommand(string.format(
-        'screenInput.onLuaCallback("%s", lpack.decode("%s"))',
-        functionName,
-        argsStr:gsub('"', '\\"')
-    ))
+    vehicle:queueLuaCommand(string.format('screenInput.onLuaCallback("%s", lpack.decode("%s"))', functionName,
+        argsStr:gsub('"', '\\"')))
 end
 
 M.callVehicleLua = callVehicleLua

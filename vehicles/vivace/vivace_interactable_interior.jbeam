@@ -44,9 +44,9 @@
       ],
       "controller": [
           ["fileName"],
-          ["screenInput"],
+          ["screenInput", {"drawBoxes":true}],
           ["newScreen", {"name":"vivace_infotainment"}],
-          ["triggerExample"],
+          ["triggerExample"]
       ],
 
       "triggerConfigPath": "vehicles/vivace/vivace_infotainment/",

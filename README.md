@@ -77,7 +77,7 @@ In your vehicle's jbeam file:
 ```json
 "controller": [
   ["fileName"],
-  ["screenInput"],
+  ["screenInput", {"drawBoxes":false}],
   ["newScreen", { "name": "your_screen_material" }]
 ]
 "your_screen_material": {
@@ -89,6 +89,7 @@ In your vehicle's jbeam file:
 ```
 
 Note: link `@your_screen_material` to the material that you wish to render the HTML texture on.
+Set `drawBoxes:true` to enable visualization of trigger boxes and reference planes.
 
 ### 2. Create Configuration Files
 
@@ -123,18 +124,6 @@ In `vehicles/yourcar/interactive_screen/`, create:
       "refPlane": "0"
     }
   ]
-}
-```
-
-**screenConfigs.jsonc** - Resolution mapping
-
-```jsonc
-{
-  "$configType": "screenConfig",
-  "your_screen_material": {
-    "width": 1920,
-    "height": 1080
-  }
 }
 ```
 
