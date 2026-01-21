@@ -8,6 +8,9 @@
 -- and that makes development so much easier (win for you). 
 
 local M = {}
+
+M.dependencies = {"ui_imgui"}
+
 M.drawBoxes = false
 
 local registeredVehicles = {}
