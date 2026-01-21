@@ -245,22 +245,26 @@ end
 -- ROTATION FUNCTION
 --------------------------------------------------------------------
 
+local _rotX, _eulerRotX = MatrixF(true), vec3()
+local _rotY, _eulerRotY = MatrixF(true), vec3()
+local _rotZ, _eulerRotZ = MatrixF(true), vec3()
+
 local function buildRotationMatrix(rot)
     if not rot then
         return MatrixF(true)
     end
-    
+
     -- Use independent axes
-    local rotX = MatrixF(true)
-    local rotY = MatrixF(true)
-    local rotZ = MatrixF(true)
-    rotX:setFromEuler(vec3(math.rad(rot.x or 0), 0, 0))
-    rotY:setFromEuler(vec3(0, math.rad(rot.y or 0), 0))
-    rotZ:setFromEuler(vec3(0, 0, math.rad(rot.z or 0)))
-    
-    local result = rotX:copy()
-    result:mul(rotY)
-    result:mul(rotZ)
+    _eulerRotX:set(math.rad(rot.x or 0), 0, 0)
+    _eulerRotY:set(0, math.rad(rot.y or 0), 0)
+    _eulerRotZ:set(0, 0, math.rad(rot.z or 0))
+    _rotX:setFromEuler(_eulerRotX)
+    _rotY:setFromEuler(_eulerRotY)
+    _rotZ:setFromEuler(_eulerRotZ)
+
+    local result = _rotX:copy()
+    result:mul(_rotY)
+    result:mul(_rotZ)
     return result
 end
 
@@ -607,6 +611,12 @@ end
 -- MAIN UPDATE LOOP
 --------------------------------------------------------------------
 
+-- Reusable variables in onUpdate, to reduce GC load
+local vehRot = quat()
+local vehPos = vec3()
+local obb = OrientedBox3F()
+local boxPos = vec3()
+
 local function onUpdate(dt)
     if not vehicle or not vehicle.getPosition or not boxes[1] then
         return
@@ -614,8 +624,8 @@ local function onUpdate(dt)
     local ray = getCameraMouseRay()
 
     local matFromRot = vehicle:getRefNodeMatrix()
-    local vehRot = quat(vehicle:getRefNodeMatrix():toQuatF())
-    local vehPos = vehicle:getPosition()
+    vehRot:set(matFromRot:toQuatF())
+    vehPos:set(vehicle:getPositionXYZ())
 
     refPlaneCache = {}
 
@@ -653,8 +663,6 @@ local function onUpdate(dt)
             goto continue
         end
 
-        local obb = OrientedBox3F()
-
         local refPlane = getReferencePlane(v.refPlane)
         local boxMat = MatrixF(true)
 
@@ -683,28 +691,34 @@ local function onUpdate(dt)
             local combinedVehRefRot = cached.combinedVehRefRot
             local refPlanePosOffset = cached.refPlanePosOffset
 
+            boxPos:set(v.pos)
+            boxPos:setRotate(combinedVehRefRot)
+            boxPos:setAdd(refPlanePosOffset)
             if v.rot then
                 local localRotMat = buildRotationMatrix(v.rot)
 
                 local combinedMat = combinedVehRefRotMat:copy()
                 combinedMat:mul(localRotMat)
                 boxMat = combinedMat
-                boxMat:setPosition(refPlanePosOffset + v.pos:rotated(combinedVehRefRot))
+                boxMat:setPosition(boxPos)
             else
                 boxMat:set(combinedVehRefRot)
-                boxMat:setPosition(refPlanePosOffset + v.pos:rotated(combinedVehRefRot))
+                boxMat:setPosition(boxPos)
             end
         else
+            boxPos:set(v.pos)
+            boxPos:setRotate(vehRot)
+            boxPos:setAdd(vehPos)
             if v.rot then
                 local localRotMat = buildRotationMatrix(v.rot)
 
                 local combinedMat = matFromRot:copy()
                 combinedMat:mul(localRotMat)
                 boxMat = combinedMat
-                boxMat:setPosition(vehPos + v.pos:rotated(vehRot))
+                boxMat:setPosition(boxPos)
             else
                 boxMat:set(vehRot)
-                boxMat:setPosition(vehPos + v.pos:rotated(vehRot))
+                boxMat:setPosition(boxPos)
             end
         end
 
@@ -718,10 +732,7 @@ local function onUpdate(dt)
             end
         end
 
-        local halfExt = obb:getHalfExtents()
-        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenter(), halfExt.x * obb:getAxis(0),
-            halfExt.y * obb:getAxis(1), halfExt.z * obb:getAxis(2))
-
+        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenterHalfExtentAxes())
         if dist < 2 then
             local screenConfig = screenConfigs[v.screenId]
             if screenConfig then
@@ -762,7 +773,6 @@ local function onUpdate(dt)
     -- Process triggers
     for k = 1, #triggers do
         local v = triggers[k]
-        local obb = OrientedBox3F()
 
         local refPlane = getReferencePlane(v.refPlane)
         local boxMat = MatrixF(true)
@@ -792,28 +802,34 @@ local function onUpdate(dt)
             local combinedVehRefRot = cached.combinedVehRefRot
             local refPlanePosOffset = cached.refPlanePosOffset
 
+            boxPos:set(v.pos)
+            boxPos:setRotate(combinedVehRefRot)
+            boxPos:setAdd(refPlanePosOffset)
             if v.rot then
                 local localRotMat = buildRotationMatrix(v.rot)
 
                 local combinedMat = combinedVehRefRotMat:copy()
                 combinedMat:mul(localRotMat)
                 boxMat = combinedMat
-                boxMat:setPosition(refPlanePosOffset + v.pos:rotated(combinedVehRefRot))
+                boxMat:setPosition(boxPos)
             else
                 boxMat:set(combinedVehRefRot)
-                boxMat:setPosition(refPlanePosOffset + v.pos:rotated(combinedVehRefRot))
+                boxMat:setPosition(boxPos)
             end
         else
+            boxPos:set(v.pos)
+            boxPos:setRotate(vehRot)
+            boxPos:setAdd(vehPos)
             if v.rot then
                 local localRotMat = buildRotationMatrix(v.rot)
 
                 local combinedMat = matFromRot:copy()
                 combinedMat:mul(localRotMat)
                 boxMat = combinedMat
-                boxMat:setPosition(vehPos + v.pos:rotated(vehRot))
+                boxMat:setPosition(boxPos)
             else
                 boxMat:set(vehRot)
-                boxMat:setPosition(vehPos + v.pos:rotated(vehRot))
+                boxMat:setPosition(boxPos)
             end
         end
 
@@ -823,9 +839,7 @@ local function onUpdate(dt)
             drawBox(obb, ColorF(0.5, 0, 1, 1))
         end
 
-        local halfExt = obb:getHalfExtents()
-        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenter(), halfExt.x * obb:getAxis(0),
-            halfExt.y * obb:getAxis(1), halfExt.z * obb:getAxis(2))
+        local dist = intersectsRay_OBB(ray.pos, ray.dir, obb:getCenterHalfExtentAxes())
 
         if dist < 2 and v.id then
             local eventData = detectTriggerInteraction(v.id)
