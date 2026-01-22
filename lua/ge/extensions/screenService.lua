@@ -89,14 +89,15 @@ end
 -- COORDINATE TRANSFORMATION
 --------------------------------------------------------------------
 
+local _hitVector = vec3()
 local function calculateScreenCoordinates(rayHitPos, obb)
     local center = obb:getCenter()
     local halfExt = obb:getHalfExtents()
-    local hitVector = rayHitPos - center
+    _hitVector:setSub2(rayHitPos, center)
 
     -- Project onto OBB's local axes (X = width, Z = height, Y = depth)
-    local localX = hitVector:dot(obb:getAxis(0)) / halfExt.x
-    local localZ = hitVector:dot(obb:getAxis(2)) / halfExt.z
+    local localX = _hitVector:dot(obb:getAxis(0)) / halfExt.x
+    local localZ = _hitVector:dot(obb:getAxis(2)) / halfExt.z
 
     -- Convert from [-1, 1] to [0, 1] normalized coordinates
     -- X is inverted: axis 0 points right-to-left, so we flip it
