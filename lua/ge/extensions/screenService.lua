@@ -121,8 +121,7 @@ local function detectMouseEvent()
 
     -- Only process mouse events from left click
     if im.IsMouseDragging(0) then
-        local delta = im.GetMouseDragDelta(0)
-        return "drag", 0, delta.x, delta.y
+        return "drag", 0
     end
 
     if im.IsMouseClicked(0) then
@@ -146,11 +145,13 @@ end
 -- COMMUNICATION
 --------------------------------------------------------------------
 
+local lastCoordinateEventData
 local function sendCoordinateEvent(eventData)
     if not vehicle then
         return
     end
 
+    lastCoordinateEventData = eventData
     -- Send coordinate event to all screen controllers
     vehicle:queueLuaCommand([[
         local eventData = lpack.decode("]] .. lpack.encode(eventData) .. [[")
@@ -740,7 +741,7 @@ local function onUpdate(dt)
 
                 local rayHitPos = ray.pos + ray.dir * dist
                 local coords = calculateScreenCoordinates(rayHitPos, obb)
-                local eventType, button, deltaX, deltaY = detectMouseEvent()
+                local eventType, button, mouseWheel = detectMouseEvent()
 
                 local eventData = {
                     type = eventType,
@@ -749,20 +750,21 @@ local function onUpdate(dt)
                     screenId = v.screenId
                 }
 
+                eventData.pixelX, eventData.pixelY = normalizedToPixel(coords.x, coords.y, screenConfig.width,
+                    screenConfig.height)
+
                 if button then
                     eventData.button = button
                 end
-                if deltaX then
-                    eventData.deltaX, eventData.deltaY = deltaX, deltaY
+                if eventType == "drag" then
+                    eventData.deltaX = eventData.pixelX - (lastCoordinateEventData.pixelX or 0)
+                    eventData.deltaY = eventData.pixelY - (lastCoordinateEventData.pixelY or 0)
                 end
 
-                if eventType == "wheel" and deltaX then
-                    eventData.deltaY = deltaX * -100
+                if eventType == "wheel" and mouseWheel then
+                    eventData.deltaY = mouseWheel * -100
                     eventData.deltaX = nil
                 end
-
-                eventData.pixelX, eventData.pixelY = normalizedToPixel(coords.x, coords.y, screenConfig.width,
-                    screenConfig.height)
 
                 sendCoordinateEvent(eventData)
             end
