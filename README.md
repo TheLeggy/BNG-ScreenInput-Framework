@@ -172,9 +172,9 @@ Complimentary JSDoc included.
 
 ---
 
-## Credits
+## Credits & Contributors
 
-Built on the concepts from DaddelZeit's CCF interactive screen system.
+**DaddelZeit** - original idea, Lua and performance optimizations
 
 ---
 
