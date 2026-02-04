@@ -156,7 +156,7 @@ local function init(jbeamData)
 end
 
 local function initSecondStage(jbeamData)
-    local displayData = jbeamData.displayData
+    local displayData = jbeamData.displayData or {}
 
     -- Merge config data from multiple parts so that some things can be defined in sub-parts
     -- Section name needs to be "configuration_xyz"
