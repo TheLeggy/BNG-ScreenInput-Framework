@@ -137,9 +137,9 @@ Add the script tag to your HTML file:
 <script src="/ui/modules/screenInput.js"></script>
 ```
 
-### 4. Add JavaScript to Your HTML Display
+### 4. Initialize ScreenInput
 
-// Add this to your HTML display
+Call `initScreenInput` with your screen's resolution and material name:
 
 ```javascript
 window.initScreenInput(1920, 1080, "your_screen_material");
