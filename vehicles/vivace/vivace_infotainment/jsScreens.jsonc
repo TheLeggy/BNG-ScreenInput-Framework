@@ -9,9 +9,9 @@
       // Center of the trigger box in local coordinates
       "pos": { "x": 0, "y": 0, "z": 0 },
 
-      // Scale of the box (size multiplier)
-      // Adjusts the box dimensions - smaller values = smaller clickable area
-      // Adjust scale to fit the physical size of your screen in the vehicle
+      // Width of the trigger box in meters
+      // Height is derived automatically from the screen's aspect ratio
+      // Adjust to match the physical size of your screen in the vehicle
       "scale": 0.235,
 
       // Depth of the trigger volume (meters)
@@ -34,7 +34,14 @@
 
       // Which screen this trigger box controls
       // Must match a screen name defined in the vehicle's jbeam controller section
-      "screenId": "vivace_infotainment"
+      "screenId": "vivace_infotainment",
+
+      // Coordinate translation (optional, defaults to 0)
+      // Shifts where clicks land on the HTML display, proportional to distance from screen center
+      // Use when the trigger box can't sit flush with the screen surface (e.g. bezel offset)
+      // Positive = spread outward, negative = compress inward; fix UV map instead if value exceeds ~0.05
+      "translateX": 0,
+      "translateY": 0
     }
   ]
 }

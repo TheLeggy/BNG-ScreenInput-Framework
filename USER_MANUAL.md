@@ -162,7 +162,9 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
       "scale": 0.2,
       "depth": 0.0005,
       "rot": { "x": 0, "y": 0, "z": 0 },
-      "refPlane": "0"
+      "refPlane": "0",
+      "translateX": 0.0,
+      "translateY": 0.0
     }
   ]
 }
@@ -177,6 +179,14 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
 - `depth` - Thickness of the trigger box (defaults to 0.0005m if not specified, though there is no reason to add your own. Anything greater than 0 works, and as low as 0.0001 has been tested.)
 - `rot` - Rotation relative to reference plane (optional, defaults to 0,0,0)
 - `refPlane` - ID of reference plane to use (optional, uses absolute coordinates if omitted)
+- `translateX` - Horizontal coordinate offset multiplier (optional, defaults to 0)
+- `translateY` - Vertical coordinate offset multiplier (optional, defaults to 0)
+
+**Coordinate translation (`translateX` / `translateY`):**
+
+`translateX` and `translateY` shift the cursor coordinates sent to your vehicle's screen. They are useful when the trigger box cannot be perfectly aligned with the screen surface. For example: when a bezel or dashboard trim causes the clickable region to sit slightly off-center relative to what is rendered.
+
+The value is a multiplier on distance from screen center. So `0.05` produces a ~2.5% shift at the extremes. That said, do fix the UV map if you find yourself going above `0.05`. Translating input will not fix fundamentally stretched textures as this is a quick fix for small offsets when you are genuinely too lazy to adjust the UV map.
 
 **How sizing works:**
 

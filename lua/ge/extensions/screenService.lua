@@ -739,16 +739,18 @@ local function onUpdate(dt)
 
                 local rayHitPos = ray.pos + ray.dir * dist
                 local coords = calculateScreenCoordinates(rayHitPos, obb)
+                local cx = clamp(coords.x + v.translateX * (coords.x - 0.5), 0, 1)
+                local cy = clamp(coords.y + v.translateY * (coords.y - 0.5), 0, 1)
                 local eventType, button, mouseWheel = detectMouseEvent()
 
                 local eventData = {
                     type = eventType,
-                    x = coords.x,
-                    y = coords.y,
+                    x = cx,
+                    y = cy,
                     screenId = v.screenId
                 }
 
-                eventData.pixelX, eventData.pixelY = normalizedToPixel(coords.x, coords.y, screenConfig.width,
+                eventData.pixelX, eventData.pixelY = normalizedToPixel(cx, cy, screenConfig.width,
                     screenConfig.height)
 
                 if button then
@@ -975,6 +977,8 @@ local function loadBoxes(path)
                     y = v.rot.y,
                     z = v.rot.z
                 }
+                box.translateX = v.translateX or 0
+                box.translateY = v.translateY or 0
                 cleaned[#cleaned + 1] = box
             end
         end

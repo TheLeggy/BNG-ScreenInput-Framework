@@ -1,1 +1,19 @@
-vehicles/vivace/vivace_infotainment/screenConfigs.jsonc.old
+
+### For a WIP build script. Still having to manually make RCs but automation isn't my specialty.
+## Unignore when ready to release ##
+build.js
+package.json
+## Unignore when ready to release ##
+
+# Node.js dependencies
+node_modules/
+SIF-Release/
+
+# npm logs
+npm-debug.log*
+npm-debug.log.*
+package-lock.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
