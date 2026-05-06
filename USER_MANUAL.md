@@ -9,14 +9,23 @@ This manual covers everything you need to know about using the Screen Input fram
 ## Table of Contents
 
 1. [Setup & Integration](#setup--integration)
+   - [Vehicle Controller Setup](#vehicle-controller-setup)
+   - [HTML Display Setup](#html-display-setup)
 2. [Configuration Files](#configuration-files)
+   - [Trigger Boxes](#trigger-boxes-configtype-triggerboxes)
+   - [Trigger Volumes](#trigger-volumes-configtype-triggers)
 3. [JavaScript API](#javascript-api)
+   - [Screen Input Events](#screen-input-events)
+   - [Trigger Events](#trigger-events)
 4. [Data Persistence API](#data-persistence-api)
+   - [Loading with Hierarchical Merging](#loading-with-hierarchical-merging)
 5. [Coordinate Systems](#coordinate-systems)
 6. [Best Practices](#best-practices)
 7. [Advanced Features](#advanced-features)
 8. [Troubleshooting](#troubleshooting)
-9. [Legacy Configuration Format](#legacy-configuration-format)
+9. [Examples](#basic-interactive-screen-vivace)
+10. [Legacy Configuration Format](#legacy-configuration-format)
+11. [License](#license)
 
 ---
 
@@ -69,6 +78,46 @@ window.initScreenInput({ enableHover: true });
 ```
 
 After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever, and build it like you would for a tablet interface.
+
+### TypeScript Support
+
+If you prefer TypeScript, the framework ships a JIT compiler that compiles `.ts` files directly in the vehicle's webview. Alternatively, if you know what you are doing, you can also use your own build process.
+
+To use the included TypeScript compiler, swap out your custom JavaScript file tag for the `loadTS` method of calling it, add the TypeScript runtime scripts, while keeping `screenInput.js`:
+
+```html
+<script src="/ui/modules/screenInput.js"></script>
+<script src="/vehicles/yourcar/interactive_screen/javascript_infotainment.js"></script>
+```
+
+becomes
+
+```html
+<script src="/ui/modules/screenInput.js"></script>
+<script src="/ui/lib/ext/sucrase/sucrase.js"></script>
+<script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
+<script>loadTS("/vehicles/yourcar/interactive_screen/typescript_infotainment.ts");</script>
+```
+
+Your TypeScript file works like any other screen script. Wire up the BeamNG callbacks directly inside it:
+
+```typescript
+window.setup = (config) => {
+  window.initScreenInput({ enableHover: true });
+};
+window.updateData = (data) => {};
+window.updateMode = (data) => {};
+```
+
+This also works for split file setups where the HTML is just layout and all logic lives in the `.ts` file. `loadTS` returns a Promise if you need to do anything after the script is ready, but currently, ScreenInput Framework does not have any features that require this.
+
+A few things worth knowing:
+
+- Types are stripped away when loading, so there is no type checking at runtime. Use your editor for that.
+- Some types will need to be declared manually. Several base game and the framework's types are included in a definitions file. See the [TypeScript](#typescript) section below for details.
+- `export`/`import` statements are handled and named exports land on `window` automatically.
+- `import type` is fully safe to use.
+- `displayData` is used differently in the TypeScript setup. See the [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript) section for details.
 
 ---
 
@@ -284,6 +333,27 @@ window.updateData = (data) => {
 
 **Important note:** This is standard BeamNG functionality and is not limited to the framework
 
+### Receiving Vehicle Data in TypeScript
+
+<!-- /**
+ * Declare which vehicle data your screen needs.
+ * Returns an object with your default values, filled in each updateData() call
+ *
+ * @param {ScreenDataSchema} schema - Data your screen uses (include default values!)
+ *
+ * @example
+ * const data = defineScreenData({
+ *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
+ *   powertrain: { engine: { outputTorque: 0 } },
+ *   customModules: { environmentData: { time: "" } }
+ * });
+ *
+ * window.updateData = (incoming) => {
+ *   Object.assign(data.electrics, incoming.electrics);
+ *   // data.electrics.rpm is now a typed number
+ * };
+ */ -->
+
 ---
 
 ## JavaScript API
@@ -446,6 +516,30 @@ document.addEventListener("beamng:trigger:click", function (event) {
   }
 });
 ```
+
+### TypeScript
+
+The sections above apply equally to TypeScript screens. This section covers things that behave differently or have a more natural form in TypeScript.
+
+**BeamNG callbacks**
+
+In plain JavaScript these are assigned inside `setup()` after `initScreenInput()` runs. In TypeScript you assign them at module scope, since `loadTS` guarantees the file has finished executing before BeamNG calls anything:
+
+```typescript
+window.setup = (config) => {
+  window.initScreenInput({ enableHover: true });
+};
+window.updateData = (data) => {};
+window.updateMode = (data) => {};
+```
+
+The framework ships a `beamng.d.ts` declaration file alongside `screenInput.js`. Add a triple-slash reference at the top of your `.ts` file to get full type coverage for the framework API, persistence functions, and BeamNG CEF globals:
+
+```typescript
+/// <reference path="/ui/modules/beamng.d.ts" />
+```
+
+Note: you may need to copy the `beamng.d.ts` file into your vehicle's directory for the reference path to resolve, depending on your editor's configuration.
 
 ---
 
@@ -972,6 +1066,7 @@ The old format used a named block in jbeam to hold the screen configuration:
   ["screenInput", {"drawBoxes": false}],
   ["newScreen", {"name": "your_screen_material"}]
 ],
+"triggerConfigPath": "vehicles/vivace/vivace_infotainment/",
 "your_screen_material": {
   "configuration": {
     "materialName": "@your_screen_material",

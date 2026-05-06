@@ -1,3 +1,5 @@
+/// <reference path="./beamng.d.ts" />
+
 /**
  * sneppy snep snep!
  *
@@ -363,23 +365,7 @@ class ScreenInputHandler {
 // Global handler instance
 let handler: ScreenInputHandler | null = null;
 
-// extend window interface
-declare global {
-  interface Window {
-    initScreenInput: (width?: number | SifConfig, height?: number, screenId?: string | null, options?: SifOptions) => void;
-    defineScreenData: <T extends ScreenDataSchema>(schema: T) => ScreenDataInstance<T>;
-    _sifConfig?: SifConfig;
-    screenInput: {
-      onInput: (eventData: CoordinateEventData) => void;
-      callLua: (functionName: string, args: unknown) => void;
-      onHover: (data: { boxId?: string | null }) => void;
-      onTrigger?: (eventData: TriggerEventData) => void;
-    };
-  }
-  const beamng: any;
-}
 export {};
-
 
 /**
  * Initialize the screen input handler.
