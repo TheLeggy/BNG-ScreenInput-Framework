@@ -33,8 +33,8 @@
       "refPlane": "0",
 
       // Which screen this trigger box controls
-      // Must match a screen name defined in the vehicle's jbeam controller section
-      "screenId": "vivace_infotainment",
+      // Must match the screenId defined in the newScreen controller entry
+      "screenId": "vivace_gps_screen",
 
       // Coordinate translation (optional, defaults to 0)
       // Shifts where clicks land on the HTML display, proportional to distance from screen center

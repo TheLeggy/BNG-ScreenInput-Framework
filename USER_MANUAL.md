@@ -16,6 +16,7 @@ This manual covers everything you need to know about using the Screen Input fram
 6. [Best Practices](#best-practices)
 7. [Advanced Features](#advanced-features)
 8. [Troubleshooting](#troubleshooting)
+9. [Legacy Configuration Format](#legacy-configuration-format)
 
 ---
 
@@ -28,35 +29,21 @@ Add the controllers to your vehicle's jbeam file:
 ```json
 "controller": [
   ["fileName"],
-  ["screenInput", {
-    "triggerConfigPath": "vehicles/yourcar/screen_configs/",
-    "drawBoxes": false
-  }],
-  ["newScreen", { "name": "your_screen_material" }]
+  ["screenInput", {"triggerConfigPath": "vehicles/yourcar/interactive_screen/"}],
+  ["newScreen", {
+    "screenId": "your_screen_material",
+    "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
+  }]
 ]
 ```
 
 - `triggerConfigPath` - Path to configuration files (defaults to `vehicles/{model}/interactive_screen/`)
-- `drawBoxes` - Enable visualization of trigger boxes and reference planes (defaults to `false`)
-- `name` - Identifier for the screen controller
-
-In the same jbeam part, add the screen configuration:
-
-```json
-"your_screen_material": {
-  "configuration": {
-    "materialName": "@your_screen_material",
-    "htmlPath": "local://local/vehicles/yourcar/interactive_screen/infotainment.html",
-    "displayWidth": 1920,
-    "displayHeight": 1080
-  }
-}
-```
-
-- `materialName` - Material name with `@` prefix added in front
-- `htmlPath` - Path to HTML display
+- `drawBoxes` - Enable visualization by adding `{"drawBoxes": true}` to the `screenInput` entry (defaults to `false`)
+- `screenId` - Material name to render the HTML on (without `@`)
+- `htmlPath` - Path to HTML display (without `local://local/` prefix)
 - `displayWidth` / `displayHeight` - Screen resolution in pixels
-  The configuration name should match the `"name"` property.
 
 For material configuration, refer to the game documentation or the `main.materials.json` file.
 
@@ -256,22 +243,20 @@ document.addEventListener("beamng:trigger:click", function (event) {
 
 To get vehicle data (like speed, RPM, gear, etc.) into your HTML display, you use the standard BeamNG `displayData` pattern. This works the same way as any other HTML screen in BeamNG.
 
-**In your jbeam screen configuration, add displayData:**
+**In your jbeam screen configuration, add displayData to the newScreen controller entry:**
 
 ```json
-"your_screen_material": {
-  "configuration": {
-    "materialName": "@your_screen_material",
-    "htmlPath": "local://local/vehicles/yourcar/interactive_screen/infotainment.html",
-    "displayWidth": 1920,
-    "displayHeight": 1080
-  },
+["newScreen", {
+  "screenId": "your_screen_material",
+  "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
+  "displayWidth": 1920,
+  "displayHeight": 1080,
   "displayData": {
     "electrics": ["propertyName", "..."],
     "customModules": [["moduleName", "propertyName"]],
     "powertrain": [["deviceName", "propertyName"]]
   }
-}
+}]
 ```
 
 The `displayData` object specifies which data streams to send to your HTML. Each key accepts any valid properties and/or pairs:
@@ -830,23 +815,20 @@ You can have multiple interactive screens in the same vehicle. Each screen needs
 **Example:**
 
 ```json
-// Two screen controllers
 "controller": [
+  ["fileName"],
+  ["screenInput"],
   ["newScreen", {
-    "configuration": {
-      "materialName": "@main_screen",
-      "htmlPath": "local://local/vehicles/yourcar/displays/infotainment/index.html",
-      "displayWidth": 1920,
-      "displayHeight": 1080
-    }
+    "screenId": "main_screen",
+    "htmlPath": "vehicles/yourcar/displays/infotainment/index.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
   }],
   ["newScreen", {
-    "configuration": {
-      "materialName": "@gauge_cluster",
-      "htmlPath": "local://local/vehicles/yourcar/displays/cluster/index.html",
-      "displayWidth": 1280,
-      "displayHeight": 480
-    }
+    "screenId": "gauge_cluster",
+    "htmlPath": "vehicles/yourcar/displays/cluster/index.html",
+    "displayWidth": 1280,
+    "displayHeight": 480
   }]
 ]
 ```
@@ -964,8 +946,9 @@ Welcome to the club. Rotation is hard. Try:
 **Check:**
 
 - Does your `screenId` in `initScreenInput()` match the material name?
-  - In jbeam: `"materialName": "@my_screen"`
   - In JavaScript: `initScreenInput(1920, 1080, "my_screen")` (no `@`)
+  - In jbeam: `"screenId": "my_screen"`
+  - In trigger boxes: `"screenId": "my_screen"`
 - If you have multiple screens, each needs a unique screenId
 - Make sure the trigger box's `screenId` matches your screen's material name
 - Verify the trigger box is actually positioned over the screen (use debug visualization)
@@ -984,6 +967,39 @@ See `vehicles/vivace/vivace_infotainment/` for a complete working example with:
 - Test menu HTML demonstrating the API
 
 This example covers all the core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
+
+---
+
+## Legacy Configuration Format
+
+If you have an existing implementation using the pre-rewrite configuration format, it will continue to work without any changes. The framework detects the old format automatically and handles it as is.
+
+The old format used a named block in jbeam to hold the screen configuration:
+
+```json
+"controller": [
+  ["screenInput", {"drawBoxes": false}],
+  ["newScreen", {"name": "your_screen_material"}]
+],
+"your_screen_material": {
+  "configuration": {
+    "materialName": "@your_screen_material",
+    "htmlPath": "local://local/vehicles/yourcar/interactive_screen/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
+  }
+}
+```
+
+The new format is recommended for new projects. If you are migrating an existing project, the changes are:
+
+- Replace the named block with fields directly on the `newScreen` controller entry
+- Rename `name` to `screenId`
+- Remove the `@` prefix from `materialName` (now `screenId`)
+- Remove the `local://local/` prefix from `htmlPath`
+- Move `triggerConfigPath` into the `screenInput` controller entry (remove from part level)
+- Move `displayData` to sit alongside the other fields on the controller entry (if used)
+- Replace any hardcoded `screenId` string in `initScreenInput()` with `config.screenId`
 
 ---
 

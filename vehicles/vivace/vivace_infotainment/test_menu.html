@@ -386,9 +386,7 @@
 
       // Required for BeamNG vehicle controller
       window.setup = function (config) {
-        window.initScreenInput( config.displayWidth, config.displayHeight, "vivace_infotainment",
-          {enableHover: true} // enables hover events
-        );
+        window.initScreenInput(config, {enableHover: true});
       };
       window.updateData = function (data) {};
       window.updateMode = function (data) {};
