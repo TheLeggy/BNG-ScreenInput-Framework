@@ -16,6 +16,7 @@ This manual covers everything you need to know about using the Screen Input fram
 6. [Best Practices](#best-practices)
 7. [Advanced Features](#advanced-features)
 8. [Troubleshooting](#troubleshooting)
+9. [Legacy Configuration Format](#legacy-configuration-format)
 
 ---
 
@@ -28,33 +29,21 @@ Add the controllers to your vehicle's jbeam file:
 ```json
 "controller": [
   ["fileName"],
-  ["screenInput", {
-    "triggerConfigPath": "vehicles/yourcar/screen_configs/",
-    "drawBoxes": false
-  }],
-  ["newScreen", { "name": "your_screen_material" }]
+  ["screenInput", {"triggerConfigPath": "vehicles/yourcar/interactive_screen/"}],
+  ["newScreen", {
+    "screenId": "your_screen_material",
+    "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
+  }]
 ]
 ```
 
 - `triggerConfigPath` - Path to configuration files (defaults to `vehicles/{model}/interactive_screen/`)
-- `drawBoxes` - Enable visualization of trigger boxes and reference planes (defaults to `false`)
-- `name` - Identifier for the screen controller
-
-In the same jbeam part, add the screen configuration:
-
-```json
-"your_screen_material": {
-  "materialName": "@your_screen_material",
-  "htmlPath": "local://local/vehicles/yourcar/interactive_screen/infotainment.html",
-  "displayWidth": 1920,
-  "displayHeight": 1080
-}
-```
-
-- `materialName` - Material name with `@` prefix added in front
-- `htmlPath` - Path to HTML display
+- `drawBoxes` - Enable visualization by adding `{"drawBoxes": true}` to the `screenInput` entry (defaults to `false`)
+- `screenId` - Material name to render the HTML on
+- `htmlPath` - Path to HTML display (without `local://local/` prefix)
 - `displayWidth` / `displayHeight` - Screen resolution in pixels
-  The configuration name should match the `"name"` property.
 
 For material configuration, refer to the game documentation or the `main.materials.json` file.
 
@@ -66,23 +55,20 @@ In your HTML file, add the screen input handler and initialize it inside the `se
 <script src="/ui/modules/screenInput.js"></script>
 <script>
   window.setup = function (config) {
-    window.initScreenInput(
-      config.displayWidth,
-      config.displayHeight,
-      "your_screen_material",
-      { enableHover: true }
-    );
+    window.initScreenInput();
   };
   window.updateData = function (data) {};
   window.updateMode = function (data) {};
 </script>
 ```
 
-By initializing inside `setup()`, your display receives the jbeam configuration which includes the screen dimensions. The fourth parameter is an optional setting where you can enable optional features.
+`initScreenInput()` reads `displayWidth`, `displayHeight`, and `screenId` automatically from your jbeam setup. Pass an options object to enable optional features:
 
-After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever and build it like you would for a tablet interface.
+```javascript
+window.initScreenInput({ enableHover: true });
+```
 
-The `screenId` parameter (third argument) should match your material name without the `@` symbol. This filters events so only raycasts hitting this specific screen trigger the display. Note that the material name in your jbeam configuration uses `@your_screen_material` with an `@`, but everywhere else (screenId in trigger boxes, JavaScript, screen configs) you use just `your_screen_material` without `@`.
+After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever, and build it like you would for a tablet interface.
 
 ---
 
@@ -160,7 +146,9 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
       "scale": 0.2,
       "depth": 0.0005,
       "rot": { "x": 0, "y": 0, "z": 0 },
-      "refPlane": "0"
+      "refPlane": "0",
+      "translateX": 0.0,
+      "translateY": 0.0
     }
   ]
 }
@@ -169,12 +157,20 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
 **Properties:**
 
 - `id` - Unique identifier for this trigger box (optional, mainly for debugging)
-- `screenId` - Material name (without `@`) that this box controls
+- `screenId` - Material name that this box controls
 - `pos` - Position relative to reference plane (or vehicle origin if no refPlane)
 - `scale` - Width of the trigger box in meters
 - `depth` - Thickness of the trigger box (defaults to 0.0005m if not specified, though there is no reason to add your own. Anything greater than 0 works, and as low as 0.0001 has been tested.)
 - `rot` - Rotation relative to reference plane (optional, defaults to 0,0,0)
 - `refPlane` - ID of reference plane to use (optional, uses absolute coordinates if omitted)
+- `translateX` - Horizontal coordinate offset multiplier (optional, defaults to 0)
+- `translateY` - Vertical coordinate offset multiplier (optional, defaults to 0)
+
+**Coordinate translation (`translateX` / `translateY`):**
+
+`translateX` and `translateY` shift the cursor coordinates sent to your vehicle's screen. They are useful when the trigger box cannot be perfectly aligned with the screen surface. For example: when a bezel or dashboard trim causes the clickable region to sit slightly off-center relative to what is rendered.
+
+The value is a multiplier on distance from screen center. So `0.05` produces a ~2.5% shift at the extremes. That said, do fix the UV map if you find yourself going above `0.05`. Translating input will not fix fundamentally stretched textures as this is a quick fix for small offsets when you are genuinely too lazy to adjust the UV map.
 
 **How sizing works:**
 
@@ -244,27 +240,27 @@ document.addEventListener("beamng:trigger:click", function (event) {
 
 To get vehicle data (like speed, RPM, gear, etc.) into your HTML display, you use the standard BeamNG `displayData` pattern. This works the same way as any other HTML screen in BeamNG.
 
-**In your jbeam screen configuration, add displayData:**
+**In your jbeam screen configuration, add displayData to the newScreen controller entry:**
 
 ```json
-"your_screen_material": {
-  "materialName": "@your_screen_material",
-  "htmlPath": "local://local/vehicles/yourcar/interactive_screen//ns/infotainment.html",
+["newScreen", {
+  "screenId": "your_screen_material",
+  "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
   "displayWidth": 1920,
   "displayHeight": 1080,
-  "displayData": [
-    ["electrics", "values"],
-    ["customModules", "environmentData"],
-    ["powertrain", "deviceData"]
-  ]
-}
+  "displayData": {
+    "electrics": ["propertyName", "..."],
+    "customModules": [["moduleName", "propertyName"]],
+    "powertrain": [["deviceName", "propertyName"]]
+  }
+}]
 ```
 
-The `displayData` array specifies which data streams to send to your HTML. Common options include:
+The `displayData` object specifies which data streams to send to your HTML. Each key accepts any valid properties and/or pairs:
 
-- `["electrics", "values"]` - Electrics values
-- `["customModules", "environmentData"]` - Data from environmentData module
-- `["powertrain", "deviceData"]` - Values from the deviceData module
+- `"electrics": ["wheelspeed", "rpm", ...]` - Electrics property names
+- `"customModules": [["moduleName", "propertyName"], ...]` - Custom module data as `[module, property]` pairs
+- `"powertrain": [["deviceName", "propertyName"], ...]` - Powertrain data as `[device, property]` pairs
 
 **In your HTML, implement the callback functions:**
 
@@ -352,32 +348,26 @@ All events include standard browser properties:
 ### Adding Your Display
 
 ```javascript
+window.initScreenInput(options);
 window.initScreenInput(width, height, screenId, options);
 ```
 
+All parameters are optional. By default, `initScreenInput()` reads `displayWidth`, `displayHeight`, and `screenId` automatically from your jbeam setup. After calling it, your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever and build it like you would for a tablet interface.
+
 **Parameters:**
 
-- `width` - Screen width in pixels (use `config.displayWidth` from jbeam)
-- `height` - Screen height in pixels (use `config.displayHeight` from jbeam)
-- `screenId` - Unique ID for the display (optional, filters events for this screen only)
 - `options` - Configuration object (optional)
   - `enableHover` - Enable automatic `hovered` class toggling (default: false)
+- `width` / `height` - Override screen dimensions in pixels. Pass `null` to use jbeam values.
+- `screenId` - Override the screen ID. Pass `null` to use jbeam value.
 
-**When to use screenId:**
+**Overrides:**
 
-If you have multiple HTML displays in the same vehicle, use `screenId` to ensure each display only receives events meant for it. The ID should match your screen material name (without the `@` symbol).
-
-**Example with options:**
+In most scenarios, you will not need to override anything. However, the ability to override screenId and dimensions is available:
 
 ```javascript
-window.setup = function (config) {
-  window.initScreenInput(
-    config.displayWidth,
-    config.displayHeight,
-    "my_screen",
-    { enableHover: true }
-  );
-};
+window.initScreenInput(null, null, "custom_id"); // override screenId, keep jbeam dimensions
+window.initScreenInput(null, number); // override height only
 ```
 
 ### Calling Vehicle Lua Functions
@@ -816,23 +806,20 @@ You can have multiple interactive screens in the same vehicle. Each screen needs
 **Example:**
 
 ```json
-// Two screen controllers
 "controller": [
+  ["fileName"],
+  ["screenInput"],
   ["newScreen", {
-    "configuration": {
-      "materialName": "@main_screen",
-      "htmlPath": "local://local/vehicles/yourcar/displays/infotainment/index.html",
-      "displayWidth": 1920,
-      "displayHeight": 1080
-    }
+    "screenId": "main_screen",
+    "htmlPath": "vehicles/yourcar/displays/infotainment/index.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
   }],
   ["newScreen", {
-    "configuration": {
-      "materialName": "@gauge_cluster",
-      "htmlPath": "local://local/vehicles/yourcar/displays/cluster/index.html",
-      "displayWidth": 1280,
-      "displayHeight": 480
-    }
+    "screenId": "gauge_cluster",
+    "htmlPath": "vehicles/yourcar/displays/cluster/index.html",
+    "displayWidth": 1280,
+    "displayHeight": 480
   }]
 ]
 ```
@@ -882,7 +869,7 @@ function showPage(pageId) {
 **Check:**
 
 - Is `initScreenInput()` called in your HTML?
-- Does `screenId` match your material name (without `@`)?
+- Does `screenId` match your material name?
 - Is the trigger box positioned correctly (enable debug visualization)?
 - Is the HTML display actually loading (check BeamNG console)?
 
@@ -950,8 +937,9 @@ Welcome to the club. Rotation is hard. Try:
 **Check:**
 
 - Does your `screenId` in `initScreenInput()` match the material name?
-  - In jbeam: `"materialName": "@my_screen"`
-  - In JavaScript: `initScreenInput(1920, 1080, "my_screen")` (no `@`)
+  - In jbeam: `"screenId": "my_screen"`
+  - In trigger boxes: `"screenId": "my_screen"`
+  - In JavaScript: `initScreenInput()` reads `screenId` from jbeam automatically. Don't change it unless you need to.
 - If you have multiple screens, each needs a unique screenId
 - Make sure the trigger box's `screenId` matches your screen's material name
 - Verify the trigger box is actually positioned over the screen (use debug visualization)
@@ -970,6 +958,39 @@ See `vehicles/vivace/vivace_infotainment/` for a complete working example with:
 - Test menu HTML demonstrating the API
 
 This example covers all the core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
+
+---
+
+## Legacy Configuration Format
+
+If you have an existing implementation using the pre-rewrite configuration format, it will continue to work without any changes. The framework detects the old format automatically and handles it as is.
+
+The old format used a named block in jbeam to hold the screen configuration:
+
+```json
+"controller": [
+  ["screenInput", {"drawBoxes": false}],
+  ["newScreen", {"name": "your_screen_material"}]
+],
+"your_screen_material": {
+  "configuration": {
+    "materialName": "@your_screen_material",
+    "htmlPath": "local://local/vehicles/yourcar/interactive_screen/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
+  }
+}
+```
+
+The new format is recommended for new projects. If you are migrating an existing project, the changes are:
+
+- Replace the named block with fields directly on the `newScreen` controller entry
+- Rename `name` to `screenId`
+- Remove the `@` prefix from `materialName` (now `screenId`)
+- Remove the `local://local/` prefix from `htmlPath`
+- Move `triggerConfigPath` into the `screenInput` controller entry (remove from part level)
+- Move `displayData` to sit alongside the other fields on the controller entry (if used)
+- Replace `initScreenInput(config)` or any hardcoded positional form with `initScreenInput()`
 
 ---
 

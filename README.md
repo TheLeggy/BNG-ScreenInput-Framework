@@ -77,19 +77,18 @@ In your vehicle's jbeam file:
 ```json
 "controller": [
   ["fileName"],
-  ["screenInput", {"drawBoxes":false}],
-  ["newScreen", { "name": "your_screen_material" }]
+  ["screenInput", {"triggerConfigPath": "vehicles/yourcar/interactive_screen/"}],
+  ["newScreen", {
+    "screenId": "your_screen_material",
+    "htmlPath": "vehicles/yourcar/screens/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080
+  }]
 ]
-"your_screen_material": {
-  "materialName": "@your_screen_material",
-  "htmlPath": "local://local/vehicles/yourcar/screens/infotainment.html",
-  "displayWidth": 1920,
-  "displayHeight": 1080
-}
 ```
 
-Note: link `@your_screen_material` to the material that you wish to render the HTML texture on.
-Set `drawBoxes:true` to enable visualization of trigger boxes and reference planes.
+Note: `screenId` must match the material name you want to render the HTML texture on (without `@`).
+Set `["screenInput", {"drawBoxes":true}]` to enable visualization of trigger boxes and reference planes.
 
 ### 2. Create Configuration Files
 
@@ -135,12 +134,14 @@ Add the script tag to your HTML file:
 <script src="/ui/modules/screenInput.js"></script>
 ```
 
-### 4. Add JavaScript to Your HTML Display
+### 4. Initialize ScreenInput
 
-// Add this to your HTML display
+Call `initScreenInput` inside your `setup()` callback:
 
 ```javascript
-window.initScreenInput(1920, 1080, "your_screen_material");
+window.setup = function(config) {
+  window.initScreenInput();
+};
 ```
 
 Your screen now responds to mouse input like any web interface would. The user manual also includes more useful information like troubleshooting, functions to communicate with the vehicle, etc.

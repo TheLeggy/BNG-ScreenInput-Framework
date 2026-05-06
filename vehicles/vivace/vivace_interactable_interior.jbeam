@@ -44,26 +44,15 @@
       ],
       "controller": [
           ["fileName"],
-          ["screenInput", {"drawBoxes":true}],
-          ["newScreen", {"name":"vivace_infotainment"}],
+          ["screenInput", {"triggerConfigPath": "vehicles/vivace/vivace_infotainment/", "drawBoxes":true}],
+          ["newScreen", {
+              "screenId": "vivace_gps_screen",
+              "htmlPath": "vehicles/vivace/vivace_infotainment/test_menu.html",
+              "displayWidth": 1024,
+              "displayHeight": 512
+          }],
           ["triggerExample"]
       ],
-
-      "triggerConfigPath": "vehicles/vivace/vivace_infotainment/",
-
-      "vivace_infotainment": {
-        "configuration": {
-          "materialName": "@vivace_gps_screen",
-          "htmlPath": "local://local/vehicles/vivace/vivace_infotainment/test_menu.html",
-          "displayWidth": 1024,
-          "displayHeight": 512
-        },
-        "displayData": {
-          "electrics": [],
-          "customModules": [],
-          "powertrain": []
-        }
-      },
       "props": [
           ["func",       "mesh",               "idRef:", "idX:", "idY:",  "baseRotation",            "rotation",               "translation",          "min", "max", "offset", "multiplier"],
           //steering column controls

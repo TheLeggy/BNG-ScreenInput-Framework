@@ -304,20 +304,69 @@ class ScreenInputHandler {
 let handler = null;
 
 /**
- * Add display to the Screen with Input system
- * @param {number} width - Screen width in pixels
- * @param {number} height - Screen height in pixels
- * @param {string} [screenId] - Unique ID for the display
- * @param {Object} [options] - Configuration object
- * @param {boolean} [options.enableHover] - Enable hover class feature
+ * Initialize the screen input handler.
+ *
+ * This can be called in two ways:
+ *
+ * `initScreenInput()` or `initScreenInput(options)` - Recommended
+ *   Uses dimensions and screenId from setup()
+ *   screenId defaults to null (accepts events from any screen)
+ *
+ * `initScreenInput(width, height, screenId, options)`
+ *   Explicit values. Pass null for any positional argument to use setup() defaults
+ *   e.g. initScreenInput(null, null, "override_id") uses setup() dimensions but overrides the screenId
+ *
+ * @param {number} [width] - Width in pixels
+ * @param {number} [height] - Height in pixels
+ * @param {string} [screenId] - Screen ID (without @)
+ * @param {Object} [options] - { enableHover: boolean }
  */
 window.initScreenInput = function (width, height, screenId, options) {
-  handler = new ScreenInputHandler(width, height, screenId);
-  // Enable automatic hover class if enabled
-  if (options && options.enableHover === true) {
+  let resolvedWidth, resolvedHeight, resolvedScreenId, resolvedOptions;
+
+  // legacy: accept a config object as first argument 
+  if (width !== null && typeof width === "object" && "displayWidth" in width) {
+    const config = width;
+    resolvedWidth = config.displayWidth;
+    resolvedHeight = config.displayHeight;
+    resolvedScreenId = config.screenId;
+    resolvedOptions = height;
+  } else {
+    // shorthand for options only
+    if (width !== null && typeof width === "object") {
+      options = width;
+      width = undefined;
+    }
+    const cfg = window._sifConfig || {};
+    resolvedWidth = width !== null && width !== undefined ? width : cfg.displayWidth;
+    resolvedHeight = height !== null && typeof height === "number" ? height : cfg.displayHeight;
+    resolvedScreenId = screenId !== null && screenId !== undefined ? screenId : cfg.screenId ?? null;
+    resolvedOptions = options;
+  }
+
+  handler = new ScreenInputHandler(resolvedWidth, resolvedHeight, resolvedScreenId);
+  if (resolvedOptions && resolvedOptions.enableHover === true) {
     handler.enableHover = true;
   }
 };
+
+// Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
+const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(window, "setup");
+if (!_originalSetupDescriptor) {
+  Object.defineProperty(window, "setup", {
+    set(fn) {
+      Object.defineProperty(window, "setup", {
+        value: function(config) {
+          window._sifConfig = config;
+          fn(config);
+        },
+        writable: true,
+        configurable: true
+      });
+    },
+    configurable: true
+  });
+}
 
 // Namespace for Lua-called functions
 window.screenInput = {

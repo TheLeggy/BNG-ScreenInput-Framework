@@ -66,7 +66,7 @@ end
 local function updateGFX(dt)
     updateTimer = updateTimer + dt
 
-    if playerInfo.anyPlayerSeated and obj:getUpdateUIflag() then
+    if htmlTextureInstance and playerInfo.anyPlayerSeated and obj:getUpdateUIflag() then
         electricsUpdate(updateTimer)
         powertrainUpdate(updateTimer)
         customModuleUpdate(updateTimer)
@@ -152,46 +152,60 @@ local function reset()
 end
 
 local function init(jbeamData)
-    controllerName = jbeamData.name
+    controllerName = jbeamData.screenId or jbeamData.name
 end
 
 local function initSecondStage(jbeamData)
-    local displayData = jbeamData.displayData
+    local displayData = jbeamData.displayData or {}
 
-    -- Merge config data from multiple parts so that some things can be defined in sub-parts
-    -- Section name needs to be "configuration_xyz"
-    local configData = jbeamData.configuration or {}
-    for k, v in pairs(jbeamData) do
-        if k:sub(1, #"configuration_") == "configuration_" then
-            tableMergeRecursive(configData, v)
+    local width, height
+    if jbeamData.htmlPath ~= nil then
+        screenName = "@" .. jbeamData.screenId
+        htmlPath = "local://local/" .. jbeamData.htmlPath
+        width = jbeamData.displayWidth
+        height = jbeamData.displayHeight
+    else
+        -- Legacy format with nested configuration block
+        local configData = jbeamData.configuration or {}
+        for k, v in pairs(jbeamData) do
+            if k:sub(1, #"configuration_") == "configuration_" then
+                tableMergeRecursive(configData, v)
+            end
         end
+        screenName = configData.materialName
+        htmlPath = configData.htmlPath
+        width = configData.displayWidth
+        height = configData.displayHeight
     end
 
-    if not configData then
-        log("E", "newScreen.initSecondStage", "Can't find config data for screen: " .. (screenName or "unknown"))
+    if not width then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** displayWidth missing from jbeam for screen '" .. tostring(controllerName) .. "'")
         return
     end
-
-    screenName = configData.materialName
-    htmlPath = configData.htmlPath
-    local width = configData.displayWidth
-    local height = configData.displayHeight
+    if not height then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** displayHeight missing from jbeam for screen '" .. tostring(controllerName) .. "'")
+        return
+    end
 
     if not screenName then
-        log("E", "newScreen.initSecondStage", "Got no material name for the texture, can't display anything...")
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** no material name (screenId) for screen '" .. tostring(controllerName) .. "'")
         return
-    else
-        if htmlPath then
-            htmlTextureInstance = htmlTexture.new(screenName, htmlPath, width, height, updateFPS)
+    end
 
-            -- Register with screenInput so it can receive screen input events
-            if screenInput then
-                screenInput.addScreen(htmlTextureInstance)
-            end
-        else
-            log("E", "newScreen.initSecondStage", "Got no html path for the texture, can't display anything...")
-            return
-        end
+    if not htmlPath then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** no htmlPath for screen '" .. tostring(controllerName) .. "'")
+        return
+    end
+
+    htmlTextureInstance = htmlTexture.new(screenName, htmlPath, width, height, updateFPS)
+
+    if not htmlTextureInstance then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** htmlTexture.new() failed for screen '" .. tostring(controllerName) .. "'. Material '" .. screenName .. "' may not exist on this mesh. Check screenId in jbeam matches the material name.")
+        return
+    end
+
+    if screenInput then
+        screenInput.addScreen(htmlTextureInstance)
     end
 
     setupElectricsData(displayData.electrics)
@@ -208,20 +222,24 @@ local function initSecondStage(jbeamData)
         uiUnitConsumptionRate = settings.getValue("uiUnitConsumptionRate") or "metric",
         uiUnitVolume = settings.getValue("uiUnitVolume") or "l",
         uiUnitPressure = settings.getValue("uiUnitPressure") or "bar",
-        uiUnitDate = settings.getValue("uiUnitDate") or "ger"
+        uiUnitDate = settings.getValue("uiUnitDate") or "ger",
+        screenId = controllerName,
+        displayWidth = width,
+        displayHeight = height
     }
-    config = tableMerge(config, configData)
 
     htmlTextureInstance:callJS("setup", config)
 
-    obj:queueGameEngineLua([[
-    if screenService and screenService.configureScreen then
-      screenService.configureScreen("]] .. controllerName .. [[", {
-        width = ]] .. width .. [[,
-        height = ]] .. height .. [[
-      })
+    if width and height then
+        obj:queueGameEngineLua([[
+        if screenService and screenService.configureScreen then
+          screenService.configureScreen("]] .. controllerName .. [[", {
+            width = ]] .. width .. [[,
+            height = ]] .. height .. [[
+          })
+        end
+      ]])
     end
-  ]])
 end
 
 local function setUIMode(parameters)
