@@ -292,8 +292,10 @@
     </div>
 
     <!-- Screen Input Framework - Shared library from screenInput mod -->
-    <script src="/ui/modules/screenInput.js"></script>
+    <script src="/ui/lib/ext/sucrase/sucrase.js"></script>
+    <script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
     <script>
+    loadTS("/ui/modules/screenInput.ts").then(function () {
 
       let currentPage = "home";
       const menuItems = document.querySelectorAll(".menu-item");
@@ -390,6 +392,7 @@
       };
       window.updateData = function (data) {};
       window.updateMode = function (data) {};
+    }); // end loadTS
     </script>
   </body>
 </html>

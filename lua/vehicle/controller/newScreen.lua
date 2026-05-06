@@ -35,6 +35,8 @@ local electricsConfig
 local powertrainConfig
 local customModuleConfig
 
+local pendingSubscription = nil
+
 local electricsUpdate = nop
 local powertrainUpdate = nop
 local customModuleUpdate = nop
@@ -148,6 +150,41 @@ local function setupCustomModuleData(config)
     customModuleUpdate = updateCustomModuleData
 end
 
+local function subscribeData(sub)
+    if not htmlTextureInstance then
+        -- dont actually know if we need this but here just in case it goes to shit
+        pendingSubscription = sub
+        return
+    end
+    if sub.electrics then
+        setupElectricsData(sub.electrics)
+        screenData.electrics = {}
+    end
+    if sub.powertrain then
+        local pt = {}
+        for deviceName, props in pairs(sub.powertrain) do
+            table.insert(pt, { deviceName = deviceName, property = props[1] })
+            for i = 2, #props do
+                table.insert(pt, { deviceName = deviceName, property = props[i] })
+            end
+        end
+        setupPowertrainData(pt)
+    end
+    if sub.customModules then
+        local cm = {}
+        for modName, props in pairs(sub.customModules) do
+            if #props == 0 then
+                table.insert(cm, { moduleName = modName })
+            else
+                for _, prop in ipairs(props) do
+                    table.insert(cm, { moduleName = modName, property = prop })
+                end
+            end
+        end
+        setupCustomModuleData(cm)
+    end
+end
+
 local function reset()
 end
 
@@ -206,11 +243,17 @@ local function initSecondStage(jbeamData)
 
     if screenInput then
         screenInput.addScreen(htmlTextureInstance)
+        screenInput.registerLuaCallback("subscribeData", subscribeData)
     end
 
     setupElectricsData(displayData.electrics)
     setupPowertrainData(displayData.powertrain)
     setupCustomModuleData(displayData.customModules)
+
+    if pendingSubscription then
+        subscribeData(pendingSubscription)
+        pendingSubscription = nil
+    end
 
     local config = {
         uiUnitLength = settings.getValue("uiUnitLength") or "metric",
@@ -259,6 +302,7 @@ M.initSecondStage = initSecondStage
 M.reset = reset
 M.updateGFX = updateGFX
 M.setParameters = setParameters
+M.subscribeData = subscribeData
 
 return M
 
