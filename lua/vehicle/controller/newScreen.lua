@@ -66,7 +66,7 @@ end
 local function updateGFX(dt)
     updateTimer = updateTimer + dt
 
-    if playerInfo.anyPlayerSeated and obj:getUpdateUIflag() then
+    if htmlTextureInstance and playerInfo.anyPlayerSeated and obj:getUpdateUIflag() then
         electricsUpdate(updateTimer)
         powertrainUpdate(updateTimer)
         customModuleUpdate(updateTimer)
@@ -178,21 +178,34 @@ local function initSecondStage(jbeamData)
         height = configData.displayHeight
     end
 
-    if not screenName then
-        log("E", "newScreen.initSecondStage", "Got no material name for the texture, can't display anything...")
+    if not width then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** displayWidth missing from jbeam for screen '" .. tostring(controllerName) .. "'")
         return
-    else
-        if htmlPath then
-            htmlTextureInstance = htmlTexture.new(screenName, htmlPath, width, height, updateFPS)
+    end
+    if not height then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** displayHeight missing from jbeam for screen '" .. tostring(controllerName) .. "'")
+        return
+    end
 
-            -- Register with screenInput so it can receive screen input events
-            if screenInput then
-                screenInput.addScreen(htmlTextureInstance)
-            end
-        else
-            log("E", "newScreen.initSecondStage", "Got no html path for the texture, can't display anything...")
-            return
-        end
+    if not screenName then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** no material name (screenId) for screen '" .. tostring(controllerName) .. "'")
+        return
+    end
+
+    if not htmlPath then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** no htmlPath for screen '" .. tostring(controllerName) .. "'")
+        return
+    end
+
+    htmlTextureInstance = htmlTexture.new(screenName, htmlPath, width, height, updateFPS)
+
+    if not htmlTextureInstance then
+        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** htmlTexture.new() failed for screen '" .. tostring(controllerName) .. "'. Material '" .. screenName .. "' may not exist on this mesh. Check screenId in jbeam matches the material name.")
+        return
+    end
+
+    if screenInput then
+        screenInput.addScreen(htmlTextureInstance)
     end
 
     setupElectricsData(displayData.electrics)
