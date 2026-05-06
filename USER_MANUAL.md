@@ -41,7 +41,7 @@ Add the controllers to your vehicle's jbeam file:
 
 - `triggerConfigPath` - Path to configuration files (defaults to `vehicles/{model}/interactive_screen/`)
 - `drawBoxes` - Enable visualization by adding `{"drawBoxes": true}` to the `screenInput` entry (defaults to `false`)
-- `screenId` - Material name to render the HTML on (without `@`)
+- `screenId` - Material name to render the HTML on
 - `htmlPath` - Path to HTML display (without `local://local/` prefix)
 - `displayWidth` / `displayHeight` - Screen resolution in pixels
 
@@ -55,23 +55,20 @@ In your HTML file, add the screen input handler and initialize it inside the `se
 <script src="/ui/modules/screenInput.js"></script>
 <script>
   window.setup = function (config) {
-    window.initScreenInput(
-      config.displayWidth,
-      config.displayHeight,
-      "your_screen_material",
-      { enableHover: true }
-    );
+    window.initScreenInput();
   };
   window.updateData = function (data) {};
   window.updateMode = function (data) {};
 </script>
 ```
 
-By initializing inside `setup()`, your display receives the jbeam configuration which includes the screen dimensions. The fourth parameter is an optional setting where you can enable optional features.
+`initScreenInput()` reads `displayWidth`, `displayHeight`, and `screenId` automatically from your jbeam setup. Pass an options object to enable optional features:
 
-After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever and build it like you would for a tablet interface.
+```javascript
+window.initScreenInput({ enableHover: true });
+```
 
-The `screenId` parameter (third argument) should match your material name without the `@` symbol. This filters events so only raycasts hitting this specific screen trigger the display. Note that the material name in your jbeam configuration uses `@your_screen_material` with an `@`, but everywhere else (screenId in trigger boxes, JavaScript, screen configs) you use just `your_screen_material` without `@`.
+After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever, and build it like you would for a tablet interface.
 
 ---
 
@@ -160,7 +157,7 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
 **Properties:**
 
 - `id` - Unique identifier for this trigger box (optional, mainly for debugging)
-- `screenId` - Material name (without `@`) that this box controls
+- `screenId` - Material name that this box controls
 - `pos` - Position relative to reference plane (or vehicle origin if no refPlane)
 - `scale` - Width of the trigger box in meters
 - `depth` - Thickness of the trigger box (defaults to 0.0005m if not specified, though there is no reason to add your own. Anything greater than 0 works, and as low as 0.0001 has been tested.)
@@ -351,32 +348,26 @@ All events include standard browser properties:
 ### Adding Your Display
 
 ```javascript
+window.initScreenInput(options);
 window.initScreenInput(width, height, screenId, options);
 ```
 
+All parameters are optional. By default, `initScreenInput()` reads `displayWidth`, `displayHeight`, and `screenId` automatically from your jbeam setup. After calling it, your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever and build it like you would for a tablet interface.
+
 **Parameters:**
 
-- `width` - Screen width in pixels (use `config.displayWidth` from jbeam)
-- `height` - Screen height in pixels (use `config.displayHeight` from jbeam)
-- `screenId` - Unique ID for the display (optional, filters events for this screen only)
 - `options` - Configuration object (optional)
   - `enableHover` - Enable automatic `hovered` class toggling (default: false)
+- `width` / `height` - Override screen dimensions in pixels. Pass `null` to use jbeam values.
+- `screenId` - Override the screen ID. Pass `null` to use jbeam value.
 
-**When to use screenId:**
+**Overrides:**
 
-If you have multiple HTML displays in the same vehicle, use `screenId` to ensure each display only receives events meant for it. The ID should match your screen material name (without the `@` symbol).
-
-**Example with options:**
+In most scenarios, you will not need to override anything. However, the ability to override screenId and dimensions is available:
 
 ```javascript
-window.setup = function (config) {
-  window.initScreenInput(
-    config.displayWidth,
-    config.displayHeight,
-    "my_screen",
-    { enableHover: true }
-  );
-};
+window.initScreenInput(null, null, "custom_id"); // override screenId, keep jbeam dimensions
+window.initScreenInput(null, number); // override height only
 ```
 
 ### Calling Vehicle Lua Functions
@@ -878,7 +869,7 @@ function showPage(pageId) {
 **Check:**
 
 - Is `initScreenInput()` called in your HTML?
-- Does `screenId` match your material name (without `@`)?
+- Does `screenId` match your material name?
 - Is the trigger box positioned correctly (enable debug visualization)?
 - Is the HTML display actually loading (check BeamNG console)?
 
@@ -946,9 +937,9 @@ Welcome to the club. Rotation is hard. Try:
 **Check:**
 
 - Does your `screenId` in `initScreenInput()` match the material name?
-  - In JavaScript: `initScreenInput(1920, 1080, "my_screen")` (no `@`)
   - In jbeam: `"screenId": "my_screen"`
   - In trigger boxes: `"screenId": "my_screen"`
+  - In JavaScript: `initScreenInput()` reads `screenId` from jbeam automatically. Don't change it unless you need to.
 - If you have multiple screens, each needs a unique screenId
 - Make sure the trigger box's `screenId` matches your screen's material name
 - Verify the trigger box is actually positioned over the screen (use debug visualization)
@@ -999,7 +990,7 @@ The new format is recommended for new projects. If you are migrating an existing
 - Remove the `local://local/` prefix from `htmlPath`
 - Move `triggerConfigPath` into the `screenInput` controller entry (remove from part level)
 - Move `displayData` to sit alongside the other fields on the controller entry (if used)
-- Replace any hardcoded `screenId` string in `initScreenInput()` with `config.screenId`
+- Replace `initScreenInput(config)` or any hardcoded positional form with `initScreenInput()`
 
 ---
 

@@ -136,10 +136,12 @@ Add the script tag to your HTML file:
 
 ### 4. Initialize ScreenInput
 
-Call `initScreenInput` with your screen's resolution and material name:
+Call `initScreenInput` inside your `setup()` callback:
 
 ```javascript
-window.initScreenInput(1920, 1080, "your_screen_material");
+window.setup = function(config) {
+  window.initScreenInput();
+};
 ```
 
 Your screen now responds to mouse input like any web interface would. The user manual also includes more useful information like troubleshooting, functions to communicate with the vehicle, etc.
