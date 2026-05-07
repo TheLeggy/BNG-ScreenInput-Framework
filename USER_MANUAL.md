@@ -14,6 +14,7 @@ This manual covers everything you need to know about using the Screen Input fram
 2. [Configuration Files](#configuration-files)
    - [Trigger Boxes](#trigger-boxes-configtype-triggerboxes)
    - [Trigger Volumes](#trigger-volumes-configtype-triggers)
+   - [Receiving Vehicle Data](#receiving-vehicle-data)
 3. [JavaScript API](#javascript-api)
    - [Screen Input Events](#screen-input-events)
    - [Trigger Events](#trigger-events)
@@ -298,18 +299,10 @@ To get vehicle data (like speed, RPM, gear, etc.) into your HTML display, you us
   "displayWidth": 1920,
   "displayHeight": 1080,
   "displayData": {
-    "electrics": ["propertyName", "..."],
-    "customModules": [["moduleName", "propertyName"]],
-    "powertrain": [["deviceName", "propertyName"]]
+    "electrics": ["wheelspeed", "rpm", "gear"]
   }
 }]
 ```
-
-The `displayData` object specifies which data streams to send to your HTML. Each key accepts any valid properties and/or pairs:
-
-- `"electrics": ["wheelspeed", "rpm", ...]` - Electrics property names
-- `"customModules": [["moduleName", "propertyName"], ...]` - Custom module data as `[module, property]` pairs
-- `"powertrain": [["deviceName", "propertyName"], ...]` - Powertrain data as `[device, property]` pairs
 
 **In your HTML, implement the callback functions:**
 
@@ -319,13 +312,10 @@ window.setup = (setupData) => {};
 
 // Called continuously with live vehicle data
 window.updateData = (data) => {
-  // Access the data streams you requested
   const speed = data.electrics.wheelspeed;
   const rpm = data.electrics.rpm;
   const gear = data.electrics.gear;
-  const temp = data.customModules.environmentData.temperatureEnv;
 
-  // Update your display
   document.getElementById("speed").textContent = Math.round(speed);
   document.getElementById("rpm").textContent = Math.round(rpm);
 };
@@ -335,24 +325,26 @@ window.updateData = (data) => {
 
 ### Receiving Vehicle Data in TypeScript
 
-<!-- /**
- * Declare which vehicle data your screen needs.
- * Returns an object with your default values, filled in each updateData() call
- *
- * @param {ScreenDataSchema} schema - Data your screen uses (include default values!)
- *
- * @example
- * const data = defineScreenData({
- *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
- *   powertrain: { engine: { outputTorque: 0 } },
- *   customModules: { environmentData: { time: "" } }
- * });
- *
- * window.updateData = (incoming) => {
- *   Object.assign(data.electrics, incoming.electrics);
- *   // data.electrics.rpm is now a typed number
- * };
- */ -->
+Screens written in TypeScript can use `defineScreenData()` instead of raw `displayData` in jbeam. It subscribes to the same data streams, declares them from the screen side with full type inference, and automatically keeps the returned object up to date.
+
+```typescript
+const data = defineScreenData({
+  electrics: { rpm: 0, gear: 0, wheelspeed: 0 }
+});
+
+window.setup = (config) => {
+  window.initScreenInput({ enableHover: true });
+};
+
+window.updateData = () => {
+  document.getElementById("rpm").textContent = String(Math.round(data.electrics.rpm));
+  document.getElementById("speed").textContent = (data.electrics.wheelspeed * 3.6).toFixed(0);
+};
+```
+
+`data.electrics.rpm` is a typed number and your editor knows the shape. Unlike in the JavaScript path, where you would need to read from the `updateData` parameter, `data` is already kept up to date.
+
+`defineScreenData()` and `displayData` in jbeam are not mutually exclusive. Both route through the same Lua subscriptions, so `defineScreenData()` extends or overrides whatever `displayData` already set up.
 
 ---
 
@@ -519,27 +511,54 @@ document.addEventListener("beamng:trigger:click", function (event) {
 
 ### TypeScript
 
-The sections above apply equally to TypeScript screens. This section covers things that behave differently or have a more natural form in TypeScript.
+The sections above apply equally to TypeScript screens. A few things behave differently:
 
-**BeamNG callbacks**
+**Callback assignment** - assign at module scope. `loadTS` guarantees the file finishes executing before BeamNG calls anything, so there's no need to wrap assignments in an init function.
 
-In plain JavaScript these are assigned inside `setup()` after `initScreenInput()` runs. In TypeScript you assign them at module scope, since `loadTS` guarantees the file has finished executing before BeamNG calls anything:
-
+**Asynchronous Execution & Guard Clauses** - Because `loadTS()` promises fetch files asynchronously over the network, files loaded later in the chain will not be immediately available on `window`. Since BeamNG's UI ticks continuously, it will likely drop an update cycle calling `window.updateData` before a module finishes network transfer and merges into the global scope. To prevent `TypeError: undefined` crashes, explicitly guard your update assignments:
 ```typescript
-window.setup = (config) => {
-  window.initScreenInput({ enableHover: true });
-};
-window.updateData = (data) => {};
-window.updateMode = (data) => {};
+window.updateData = () => {
+    if (!window.vehicleData) return; // Wait until vehicleData.ts merges
+    document.getElementById("rpm").textContent = window.vehicleData.electrics.rpm;
+}
 ```
 
-The framework ships a `beamng.d.ts` declaration file alongside `screenInput.js`. Add a triple-slash reference at the top of your `.ts` file to get full type coverage for the framework API, persistence functions, and BeamNG CEF globals:
+**Vehicle data** - use `defineScreenData()` instead of reading from the `updateData` parameter. See [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript).
 
-```typescript
-/// <reference path="/ui/modules/beamng.d.ts" />
-```
+**Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Since this framework compiles your code on the fly without needing a complex `tsconfig.json` setup, your editor (like VS Code) won't automatically know what `defineScreenData`, `window.vehicleData`, or the standard `beamng` globals actually are. 
 
-Note: you may need to copy the `beamng.d.ts` file into your vehicle's directory for the reference path to resolve, depending on your editor's configuration.
+To fix "Cannot find name" errors, eliminate red squiggly lines, and get full autocompletion, you must explicitly link the `.d.ts` file so your editor can find it.
+
+There are three primary ways to do this:
+
+1. **Local Copy (Recommended)** - Copy the `beamng.d.ts` file from `ui/modules/` directly into your vehicle's screen folder next to your `.ts` scripts. Then just link it like this at line 1 of every `.ts` file:
+   ```typescript
+   /// <reference path="./beamng.d.ts" />
+   ```
+
+2. **Relative Path** - Point directly back to the framework's core file from your vehicle folder's depth at the top of every file. Depending on how many folders deep you are, it looks something like this:
+   ```typescript
+   /// <reference path="../../../../ui/modules/beamng.d.ts" />
+   ```
+   Note: You will need to unpack the Screen Input framework into your mod folder to use this method.
+
+3. **`tsconfig.json` (Cleanest / Advanced)** - If you don't want to copy files or add triple-slash references to the top of every single script, you can create a standard `tsconfig.json` file in your mod's root folder. This tells VS Code (or your IDE of choice) exactly where to find the framework types globally:
+   ```json
+   {
+     "compilerOptions": {
+       "target": "es2022",
+       "lib": ["es2022", "dom"],
+       "moduleResolution": "node"
+     },
+     "include": [
+       "**/*.ts",
+       "ui/modules/beamng.d.ts"
+     ]
+   }
+   ```
+
+
+Because the Sucrase compiler strips out TypeScript types and comments before sending code to the browser engine, these triple-slash references are strictly for your editor to help you code.
 
 ---
 

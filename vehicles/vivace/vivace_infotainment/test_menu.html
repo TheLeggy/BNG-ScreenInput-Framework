@@ -281,10 +281,15 @@
           </div>
         </div>
         <div class="content-body" data-page="info">
-          <div class="content-header">Information</div>
-          <p style="font-size: 12px; line-height: 1.8">
-            <strong>There is no more information</strong><br /><br />
+          <div class="content-header">Vehicle Data</div>
+          <p style="font-size: 12px; line-height: 1.8; color: #aaa">
+            Live vehicle data via <code>defineScreenData</code>:
           </p>
+          <table style="font-family: monospace; font-size: 14px; border-collapse: collapse; width: 100%">
+            <tr><td style="padding: 6px 10px; color: #888">RPM</td><td id="data-rpm" style="padding: 6px 10px">-</td></tr>
+            <tr><td style="padding: 6px 10px; color: #888">Gear</td><td id="data-gear" style="padding: 6px 10px">-</td></tr>
+            <tr><td style="padding: 6px 10px; color: #888">Wheel Speed</td><td id="data-wheelspeed" style="padding: 6px 10px">-</td></tr>
+          </table>
         </div>
 
         <div class="back-button" id="back-btn">← BACK TO HOME</div>
@@ -295,7 +300,8 @@
     <script src="/ui/lib/ext/sucrase/sucrase.js"></script>
     <script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
     <script>
-    loadTS("/ui/modules/screenInput.ts").then(function () {
+    loadTS("/ui/modules/screenInput.ts")
+      .then(function () {
 
       let currentPage = "home";
       const menuItems = document.querySelectorAll(".menu-item");
@@ -390,8 +396,16 @@
       window.setup = function (config) {
         window.initScreenInput({enableHover: true});
       };
-      window.updateData = function (data) {};
+
+      window.updateData = function () {
+        if (!window.vehicleData) return;
+        document.getElementById("data-rpm").textContent = Math.round(window.vehicleData.electrics.rpm);
+        document.getElementById("data-gear").textContent = window.vehicleData.electrics.gear;
+        document.getElementById("data-wheelspeed").textContent = (window.vehicleData.electrics.wheelspeed * 3.6).toFixed(1) + " km/h";
+      };
       window.updateMode = function (data) {};
+
+      return loadTS("/vehicles/vivace/vivace_infotainment/vehicleData.ts");
     }); // end loadTS
     </script>
   </body>

@@ -49,13 +49,9 @@ export interface SifConfig {
 }
 
 type ElectricsSchema = Record<string, number | boolean | string | null>;
-type PowertrainSchema = Record<string, Record<string, number>>;
-type CustomModulesSchema = Record<string, Record<string, any>>;
 
 export interface ScreenDataSchema {
   electrics?: ElectricsSchema;
-  powertrain?: PowertrainSchema;
-  customModules?: CustomModulesSchema;
 }
 
 type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
@@ -1006,20 +1002,17 @@ function persistGetSource(filename: string, key: string, callback: (source: stri
 
 /**
  * Declare which vehicle data your screen needs.
- * Returns an object with your default values, filled in each updateData() call
+ * Returns a typed object kept up to date automatically on each updateData() call
  *
  * @param {ScreenDataSchema} schema - Data your screen uses (include default values!)
  *
  * @example
  * const data = defineScreenData({
- *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
- *   powertrain: { engine: { outputTorque: 0 } },
- *   customModules: { environmentData: { time: "" } }
+ *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 }
  * });
  *
- * window.updateData = (incoming) => {
- *   Object.assign(data.electrics, incoming.electrics);
- *   // data.electrics.rpm is now a typed number
+ * window.updateData = () => {
+ *   document.getElementById("rpm").textContent = data.electrics.rpm;
  * };
  */
 function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInstance<T> {
@@ -1031,24 +1024,21 @@ function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInst
     if (schema.electrics) {
       sub.electrics = Object.keys(schema.electrics);
     }
-    if (schema.powertrain) {
-      sub.powertrain = {};
-      for (const device in schema.powertrain) {
-        sub.powertrain[device] = Object.keys((schema.powertrain as any)[device]);
-      }
-    }
-    if (schema.customModules) {
-      sub.customModules = {};
-      for (const mod in schema.customModules) {
-        sub.customModules[mod] = Object.keys((schema.customModules as any)[mod]);
-      }
-    }
 
     const json = JSON.stringify(sub);
     beamng.sendEngineLua(
       `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`
     );
   }
+
+  // Install updateData wrapper after setup() returns so user's assignment is captured
+  setTimeout(() => {
+    const userUpdateData = window.updateData;
+    window.updateData = (incoming: any) => {
+      if (incoming.electrics) Object.assign(instance.electrics as object, incoming.electrics);
+      if (userUpdateData) userUpdateData(incoming);
+    };
+  }, 0);
 
   return instance;
 }

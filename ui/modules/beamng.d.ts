@@ -43,10 +43,26 @@ type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
 type ScreenDataInstance<T extends ScreenDataSchema> = DeepWriteable<T>;
 
 declare global {
+  function initScreenInput(width?: number | SifConfig, height?: number, screenId?: string | null, options?: SifOptions): void;
+  function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInstance<T>;
+  function loadTS(url: string): Promise<void>;
+  function callVehicleLua(functionName: string, args?: unknown): void;
+  function persistSave(filename: string, data: object, scope?: string, userId?: string, identifier?: string): void;
+  function persistLoad(filename: string, callback: (data: any) => void, scope?: string, userId?: string, identifier?: string): void;
+  function persistExists(filename: string, callback: (exists: boolean) => void, scope?: string, userId?: string, identifier?: string): void;
+  function persistDelete(filename: string, scope?: string, userId?: string, identifier?: string): void;
+  function persistLoadMerged(filename: string, callback: (data: any, sources: Record<string, string>) => void, userId?: string, identifier?: string): void;
+  function persistRegisterDefaults(filename: string, defaults: object): void;
+  function persistInitDefaults(filename: string): void;
+  function persistResetToFactory(filename: string, scope?: string, userId?: string, identifier?: string): void;
+  function persistGetSource(filename: string, key: string, callback: (source: string) => void, userId?: string, identifier?: string): void;
+  function persistListUsers(filename: string, callback: (users: string[]) => void, identifier?: string): void;
+  function getLicensePlate(callback: (plate: string) => void): void;
+
   interface Window {
     // Screen Input Framework
-    initScreenInput: (width?: number | SifConfig, height?: number, screenId?: string | null, options?: SifOptions) => void;
-    defineScreenData: <T extends ScreenDataSchema>(schema: T) => ScreenDataInstance<T>;
+    initScreenInput: typeof initScreenInput;
+    defineScreenData: typeof defineScreenData;
     _sifConfig?: SifConfig;
     screenInput: {
       onInput: (eventData: CoordinateEventData) => void;
@@ -57,19 +73,19 @@ declare global {
     setup: (config: SifConfig) => void;
     updateData: (data: any) => void;
     updateMode: (data: any) => void;
-    loadTS: (url: string) => Promise<void>;
-    callVehicleLua: (functionName: string, args?: unknown) => void;
-    persistSave: (filename: string, data: object, scope?: string, userId?: string, identifier?: string) => void;
-    persistLoad: (filename: string, callback: (data: any) => void, scope?: string, userId?: string, identifier?: string) => void;
-    persistExists: (filename: string, callback: (exists: boolean) => void, scope?: string, userId?: string, identifier?: string) => void;
-    persistDelete: (filename: string, scope?: string, userId?: string, identifier?: string) => void;
-    persistLoadMerged: (filename: string, callback: (data: any, sources: Record<string, string>) => void, userId?: string, identifier?: string) => void;
-    persistRegisterDefaults: (filename: string, defaults: object) => void;
-    persistInitDefaults: (filename: string) => void;
-    persistResetToFactory: (filename: string, scope?: string, userId?: string, identifier?: string) => void;
-    persistGetSource: (filename: string, key: string, callback: (source: string) => void, userId?: string, identifier?: string) => void;
-    persistListUsers: (filename: string, callback: (users: string[]) => void, identifier?: string) => void;
-    getLicensePlate: (callback: (plate: string) => void) => void;
+    loadTS: typeof loadTS;
+    callVehicleLua: typeof callVehicleLua;
+    persistSave: typeof persistSave;
+    persistLoad: typeof persistLoad;
+    persistExists: typeof persistExists;
+    persistDelete: typeof persistDelete;
+    persistLoadMerged: typeof persistLoadMerged;
+    persistRegisterDefaults: typeof persistRegisterDefaults;
+    persistInitDefaults: typeof persistInitDefaults;
+    persistResetToFactory: typeof persistResetToFactory;
+    persistGetSource: typeof persistGetSource;
+    persistListUsers: typeof persistListUsers;
+    getLicensePlate: typeof getLicensePlate;
 
     // BeamNG CEF globals
     bridge: {
