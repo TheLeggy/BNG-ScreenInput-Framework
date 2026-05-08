@@ -1054,9 +1054,26 @@ end
 -- LIFECYCLE
 --------------------------------------------------------------------
 
+-- Queue calls made while vehicle is nil and flush them once setFocusCar establishes the refe
+-- callVehicleLua can be called before setFocusCar fires and that causes a whole load of 
+-- synchronization issues
+
+local pendingVehicleLuaCalls = {}
+
+local function flushPendingVehicleLuaCalls()
+    if not vehicle then return end
+    for _, call in ipairs(pendingVehicleLuaCalls) do
+        local argsStr = lpack.encode(call.args)
+        vehicle:queueLuaCommand(string.format('screenInput.onLuaCallback("%s", lpack.decode("%s"))', call.functionName,
+            argsStr:gsub('"', '\\"')))
+    end
+    pendingVehicleLuaCalls = {}
+end
+
 local function setFocusCar(id)
     vehicle = scenetree.findObject(id)
     registeredVehicles[id] = true
+    flushPendingVehicleLuaCalls()
 end
 
 local function onVehicleDestroyed(vid)
@@ -1696,6 +1713,7 @@ M.persistCopyPreset = persistCopyPreset
 
 local function callVehicleLua(functionName, args)
     if not vehicle then
+        table.insert(pendingVehicleLuaCalls, {functionName = functionName, args = args})
         return
     end
 

@@ -325,11 +325,18 @@ window.updateData = (data) => {
 
 ### Receiving Vehicle Data in TypeScript
 
-Screens written in TypeScript can use `defineScreenData()` instead of raw `displayData` in jbeam. It subscribes to the same data streams, declares them from the screen side with full type inference, and automatically keeps the returned object up to date.
+Screens written in TypeScript can use `defineScreenData()` instead of raw `displayData` in jbeam. It subscribes to `electric`, `powertrain`, and `customModules`, declares them from the screen side with full type inference, and automatically keeps the returned object up to date.
 
 ```typescript
 const data = defineScreenData({
-  electrics: { rpm: 0, gear: 0, wheelspeed: 0 }
+  electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
+  powertrain: {
+    mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
+    gearbox: { gearIndex: 0 }
+  },
+  customModules: {
+    combustionEngineData: { currentPower: 0, currentTorque: 0 }
+  }
 });
 
 window.setup = (config) => {
@@ -339,10 +346,14 @@ window.setup = (config) => {
 window.updateData = () => {
   document.getElementById("rpm").textContent = String(Math.round(data.electrics.rpm));
   document.getElementById("speed").textContent = (data.electrics.wheelspeed * 3.6).toFixed(0);
+  document.getElementById("torque").textContent = data.powertrain.mainEngine.outputTorque1.toFixed(1);
+  document.getElementById("power").textContent = data.customModules.combustionEngineData.currentPower.toFixed(1);
 };
 ```
 
-`data.electrics.rpm` is a typed number and your editor knows the shape. Unlike in the JavaScript path, where you would need to read from the `updateData` parameter, `data` is already kept up to date.
+`data.electrics.rpm`, `data.powertrain.mainEngine.outputTorque1`, and other returned fields are typed and your editor knows the shape. Unlike in the JavaScript path, where you would need to read from the `updateData` parameter, `data` is already kept up to date.
+
+For `powertrain`, each key is a device name (such as `mainEngine` or `gearbox`) and each nested key is a property on that device. For `customModules`, each key is a controller name under `gauges/customModules/`, and those controllers must be loaded by a jbeam somewhere in the vehicle.
 
 `defineScreenData()` and `displayData` in jbeam are not mutually exclusive. Both route through the same Lua subscriptions, so `defineScreenData()` extends or overrides whatever `displayData` already set up.
 
@@ -516,6 +527,7 @@ The sections above apply equally to TypeScript screens. A few things behave diff
 **Callback assignment** - assign at module scope. `loadTS` guarantees the file finishes executing before BeamNG calls anything, so there's no need to wrap assignments in an init function.
 
 **Asynchronous Execution & Guard Clauses** - Because `loadTS()` promises fetch files asynchronously over the network, files loaded later in the chain will not be immediately available on `window`. Since BeamNG's UI ticks continuously, it will likely drop an update cycle calling `window.updateData` before a module finishes network transfer and merges into the global scope. To prevent `TypeError: undefined` crashes, explicitly guard your update assignments:
+
 ```typescript
 window.updateData = () => {
     if (!window.vehicleData) return; // Wait until vehicleData.ts merges

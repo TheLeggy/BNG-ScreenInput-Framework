@@ -49,9 +49,14 @@ export interface SifConfig {
 }
 
 type ElectricsSchema = Record<string, number | boolean | string | null>;
+type DeviceSchema = Record<string, number | boolean | string | null>;
+type PowertrainSchema = Record<string, DeviceSchema>;
+type CustomModulesSchema = Record<string, DeviceSchema>;
 
 export interface ScreenDataSchema {
   electrics?: ElectricsSchema;
+  powertrain?: PowertrainSchema;
+  customModules?: CustomModulesSchema;
 }
 
 type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
@@ -1002,17 +1007,27 @@ function persistGetSource(filename: string, key: string, callback: (source: stri
 
 /**
  * Declare which vehicle data your screen needs.
+ * Subscribes to electrics, powertrain devices, and custom modules
  * Returns a typed object kept up to date automatically on each updateData() call
  *
  * @param {ScreenDataSchema} schema - Data your screen uses (include default values!)
  *
  * @example
  * const data = defineScreenData({
- *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 }
+ *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
+ *   powertrain: {
+ *     mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
+ *     gearbox: { gearIndex: 0 }
+ *   },
+ *   customModules: {
+ *     combustionEngineData: { currentPower: 0, currentTorque: 0 }
+ *   }
  * });
  *
  * window.updateData = () => {
  *   document.getElementById("rpm").textContent = data.electrics.rpm;
+ *   document.getElementById("torque").textContent = data.powertrain.mainEngine.outputTorque1;
+ *   document.getElementById("power").textContent = data.customModules.combustionEngineData.currentPower;
  * };
  */
 function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInstance<T> {
@@ -1023,6 +1038,27 @@ function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInst
 
     if (schema.electrics) {
       sub.electrics = Object.keys(schema.electrics);
+    }
+
+    // build header-table format [["deviceName","property"], ["engine","rpm"], ...]
+    if (schema.powertrain) {
+      const rows: string[][] = [["deviceName", "property"]];
+      for (const deviceName of Object.keys(schema.powertrain)) {
+        for (const property of Object.keys(schema.powertrain[deviceName])) {
+          rows.push([deviceName, property]);
+        }
+      }
+      sub.powertrain = rows;
+    }
+
+    if (schema.customModules) {
+      const rows: string[][] = [["moduleName", "property"]];
+      for (const moduleName of Object.keys(schema.customModules)) {
+        for (const property of Object.keys(schema.customModules[moduleName])) {
+          rows.push([moduleName, property]);
+        }
+      }
+      sub.customModules = rows;
     }
 
     const json = JSON.stringify(sub);
@@ -1036,6 +1072,20 @@ function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInst
     const userUpdateData = window.updateData;
     window.updateData = (incoming: any) => {
       if (incoming.electrics) Object.assign(instance.electrics as object, incoming.electrics);
+      if (incoming.powertrain) {
+        for (const device of Object.keys(incoming.powertrain)) {
+          if (instance.powertrain && (instance.powertrain as any)[device]) {
+            Object.assign((instance.powertrain as any)[device], incoming.powertrain[device]);
+          }
+        }
+      }
+      if (incoming.customModules) {
+        for (const mod of Object.keys(incoming.customModules)) {
+          if (instance.customModules && (instance.customModules as any)[mod]) {
+            Object.assign((instance.customModules as any)[mod], incoming.customModules[mod]);
+          }
+        }
+      }
       if (userUpdateData) userUpdateData(incoming);
     };
   }, 0);

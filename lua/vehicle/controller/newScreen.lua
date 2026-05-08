@@ -148,6 +148,12 @@ local function subscribeData(sub)
         setupElectricsData(sub.electrics)
         screenData.electrics = {}
     end
+    if sub.powertrain then
+        setupPowertrainData(sub.powertrain)
+    end
+    if sub.customModules then
+        setupCustomModuleData(sub.customModules)
+    end
 end
 
 local function reset()
