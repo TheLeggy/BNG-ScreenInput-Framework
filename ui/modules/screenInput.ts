@@ -366,8 +366,6 @@ class ScreenInputHandler {
 // Global handler instance
 let handler: ScreenInputHandler | null = null;
 
-export {};
-
 /**
  * Initialize the screen input handler.
  *
