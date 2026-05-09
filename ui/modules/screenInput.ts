@@ -15,7 +15,15 @@
  */
 
 export interface CoordinateEventData {
-  type: "click" | "mousedown" | "mouseup" | "mousemove" | "mouseenter" | "mouseleave" | "drag" | "wheel";
+  type:
+    | "click"
+    | "mousedown"
+    | "mouseup"
+    | "mousemove"
+    | "mouseenter"
+    | "mouseleave"
+    | "drag"
+    | "wheel";
   x: number;
   y: number;
   screenId?: string;
@@ -76,7 +84,11 @@ class ScreenInputHandler {
   lastMouseMoveTime: number;
   mouseMoveThrottle: number;
 
-  constructor(screenWidth: number, screenHeight: number, screenId: string | null = null) {
+  constructor(
+    screenWidth: number,
+    screenHeight: number,
+    screenId: string | null = null
+  ) {
     this.screenWidth = screenWidth;
     this.screenHeight = screenHeight;
     this.screenId = screenId;
@@ -156,7 +168,12 @@ class ScreenInputHandler {
     element.dispatchEvent(event);
   }
 
-  handleMouseDown(element: Element | null, x: number, y: number, button: number) {
+  handleMouseDown(
+    element: Element | null,
+    x: number,
+    y: number,
+    button: number
+  ) {
     if (!element) return;
 
     const event = new MouseEvent("mousedown", {
@@ -301,7 +318,13 @@ class ScreenInputHandler {
     this.hoveredElements = [];
   }
 
-  handleDrag(element: Element | null, x: number, y: number, deltaX: number, deltaY: number) {
+  handleDrag(
+    element: Element | null,
+    x: number,
+    y: number,
+    deltaX: number,
+    deltaY: number
+  ) {
     if (!element) return;
 
     const event = new MouseEvent("drag", {
@@ -385,10 +408,18 @@ let handler: ScreenInputHandler | null = null;
  * @param {Object} [options] - { enableHover: boolean }
  */
 window.initScreenInput = function (width, height, screenId, options) {
-  let resolvedWidth: number, resolvedHeight: number, resolvedScreenId: string | null | undefined, resolvedOptions: SifOptions | undefined;
+  let resolvedWidth: number,
+    resolvedHeight: number,
+    resolvedScreenId: string | null | undefined,
+    resolvedOptions: SifOptions | undefined;
 
-  // legacy: accept a config object as first argument 
-  if (width !== null && width !== undefined && typeof width === "object" && "displayWidth" in width) {
+  // legacy: accept a config object as first argument
+  if (
+    width !== null &&
+    width !== undefined &&
+    typeof width === "object" &&
+    "displayWidth" in width
+  ) {
     const config = width as SifConfig;
     resolvedWidth = config.displayWidth as number;
     resolvedHeight = config.displayHeight as number;
@@ -401,33 +432,47 @@ window.initScreenInput = function (width, height, screenId, options) {
       width = undefined;
     }
     const cfg = window._sifConfig || {};
-    resolvedWidth = (width !== null && width !== undefined ? width : cfg.displayWidth) as number;
-    resolvedHeight = (height !== null && typeof height === "number" ? height : cfg.displayHeight) as number;
-    resolvedScreenId = screenId !== null && screenId !== undefined ? screenId : cfg.screenId ?? null;
+    resolvedWidth = (
+      width !== null && width !== undefined ? width : cfg.displayWidth
+    ) as number;
+    resolvedHeight = (
+      height !== null && typeof height === "number" ? height : cfg.displayHeight
+    ) as number;
+    resolvedScreenId =
+      screenId !== null && screenId !== undefined
+        ? screenId
+        : cfg.screenId ?? null;
     resolvedOptions = options;
   }
 
-  handler = new ScreenInputHandler(resolvedWidth, resolvedHeight, resolvedScreenId || null);
+  handler = new ScreenInputHandler(
+    resolvedWidth,
+    resolvedHeight,
+    resolvedScreenId || null
+  );
   if (resolvedOptions && resolvedOptions.enableHover === true) {
     handler.enableHover = true;
   }
 };
 
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
-const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(window, "setup");
+const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  "setup"
+);
 if (!_originalSetupDescriptor) {
   Object.defineProperty(window, "setup", {
     set(fn) {
       Object.defineProperty(window, "setup", {
-        value: function(config: any) {
+        value: function (config: any) {
           (window as any)._sifConfig = config;
           fn(config);
         },
         writable: true,
-        configurable: true
+        configurable: true,
       });
     },
-    configurable: true
+    configurable: true,
   });
 }
 
@@ -587,7 +632,13 @@ window.screenInput = {
  * // Save user-specific data (for login/profile systems)
  * persistSave("preferences", { seat: "memory1" }, "user", "john_doe");
  */
-function persistSave(filename: string, data: any, scope?: string, userId?: string, identifier?: string) {
+function persistSave(
+  filename: string,
+  data: any,
+  scope?: string,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -616,7 +667,13 @@ function persistSave(filename: string, data: any, scope?: string, userId?: strin
  * @param {string} [userId] - User identifier (for "user" scope)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistLoad(filename: string, callback: (data: any) => void, scope?: string, userId?: string, identifier?: string) {
+function persistLoad(
+  filename: string,
+  callback: (data: any) => void,
+  scope?: string,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -664,7 +721,13 @@ function persistLoad(filename: string, callback: (data: any) => void, scope?: st
  * @param {string} [userId] - User identifier (for "user" scope)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistExists(filename: string, callback: (exists: boolean | string) => void, scope?: string, userId?: string, identifier?: string) {
+function persistExists(
+  filename: string,
+  callback: (exists: boolean | string) => void,
+  scope?: string,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -710,7 +773,12 @@ function persistExists(filename: string, callback: (exists: boolean | string) =>
  * @param {string} [userId] - User identifier (for "user" scope)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistDelete(filename: string, scope?: string, userId?: string, identifier?: string) {
+function persistDelete(
+  filename: string,
+  scope?: string,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -773,7 +841,11 @@ function getLicensePlate(callback: (plate: string | null) => void) {
  * @param {function} callback - Function to call with array of user IDs
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistListUsers(filename: string, callback: (users: string[]) => void, identifier?: string) {
+function persistListUsers(
+  filename: string,
+  callback: (users: string[]) => void,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -866,7 +938,12 @@ function persistInitDefaults(filename: string, defaults?: any) {
  * @param {string} [userId] - User identifier (required when scope is "user")
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistResetToFactory(filename: string, scope?: string, userId?: string, identifier?: string) {
+function persistResetToFactory(
+  filename: string,
+  scope?: string,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -899,7 +976,12 @@ function persistResetToFactory(filename: string, scope?: string, userId?: string
  * @param {string} [userId] - User identifier (adds user scope to merge)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistLoadMerged(filename: string, callback: (data: any, sources: any) => void, userId?: string, identifier?: string) {
+function persistLoadMerged(
+  filename: string,
+  callback: (data: any, sources: any) => void,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -945,7 +1027,13 @@ function persistLoadMerged(filename: string, callback: (data: any, sources: any)
  * @param {string} [userId] - User identifier (includes user scope in search)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistGetSource(filename: string, key: string, callback: (source: string | null) => void, userId?: string, identifier?: string) {
+function persistGetSource(
+  filename: string,
+  key: string,
+  callback: (source: string | null) => void,
+  userId?: string,
+  identifier?: string
+) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -1028,10 +1116,15 @@ function persistGetSource(filename: string, key: string, callback: (source: stri
  *   document.getElementById("power").textContent = data.customModules.combustionEngineData.currentPower;
  * };
  */
-function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInstance<T> {
+function defineScreenData<T extends ScreenDataSchema>(
+  schema: T
+): ScreenDataInstance<T> {
   const instance = JSON.parse(JSON.stringify(schema)) as ScreenDataInstance<T>;
 
-  if (typeof beamng !== "undefined" && typeof beamng.sendEngineLua === "function") {
+  if (
+    typeof beamng !== "undefined" &&
+    typeof beamng.sendEngineLua === "function"
+  ) {
     const sub: Record<string, any> = {};
 
     if (schema.electrics) {
@@ -1069,18 +1162,25 @@ function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInst
   setTimeout(() => {
     const userUpdateData = window.updateData;
     window.updateData = (incoming: any) => {
-      if (incoming.electrics) Object.assign(instance.electrics as object, incoming.electrics);
+      if (incoming.electrics)
+        Object.assign(instance.electrics as object, incoming.electrics);
       if (incoming.powertrain) {
         for (const device of Object.keys(incoming.powertrain)) {
           if (instance.powertrain && (instance.powertrain as any)[device]) {
-            Object.assign((instance.powertrain as any)[device], incoming.powertrain[device]);
+            Object.assign(
+              (instance.powertrain as any)[device],
+              incoming.powertrain[device]
+            );
           }
         }
       }
       if (incoming.customModules) {
         for (const mod of Object.keys(incoming.customModules)) {
           if (instance.customModules && (instance.customModules as any)[mod]) {
-            Object.assign((instance.customModules as any)[mod], incoming.customModules[mod]);
+            Object.assign(
+              (instance.customModules as any)[mod],
+              incoming.customModules[mod]
+            );
           }
         }
       }
@@ -1115,7 +1215,10 @@ function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInst
  * @example
  * callVehicleLua("playSound", { sound: "click", volume: 0.8 });
  */
-(window as any).callVehicleLua = function (functionName: string, args: unknown) {
+(window as any).callVehicleLua = function (
+  functionName: string,
+  args: unknown
+) {
   window.screenInput.callLua(functionName, args);
 };
 
