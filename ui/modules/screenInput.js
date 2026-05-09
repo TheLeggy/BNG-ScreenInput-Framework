@@ -1,94 +1,5 @@
-/// <reference path="./beamng.d.ts" />
-
-/**
- * sneppy snep snep!
- *
- * Be warned (!!!!): using this code means you give
- *     away your soul to the snow leopard gods!
- *
- * Translates BeamNG coordinate events to browser-like events
- *
- * Part of the screenInput framework - makes vehicle HTML displays actually usable
- * by converting 3D raycasts into standard DOM events. Effectively allows the HTML
- * to treat coordinate input as if it was running on a tablet, but also provides
- * the flexibility to handle more complex interactions when needed.
- */
-
-export interface CoordinateEventData {
-  type:
-    | "click"
-    | "mousedown"
-    | "mouseup"
-    | "mousemove"
-    | "mouseenter"
-    | "mouseleave"
-    | "drag"
-    | "wheel";
-  x: number;
-  y: number;
-  screenId?: string;
-  button: number;
-  deltaX: number;
-  deltaY: number;
-  pixelX?: number;
-  pixelY?: number;
-}
-
-export interface TriggerEventData {
-  id: string;
-  action?: string;
-  duration?: number;
-  deltaX?: number;
-  deltaY?: number;
-}
-
-export interface PersistCallbackData {
-  type: "loaded" | "merged" | "exists" | "plate" | "users" | "source";
-  callbackId: string;
-  data: any;
-  sources?: any;
-}
-
-export interface SifConfig {
-  displayWidth?: number;
-  displayHeight?: number;
-  screenId?: string;
-  [key: string]: any;
-}
-
-type ElectricsSchema = Record<string, number | boolean | string | null>;
-type DeviceSchema = Record<string, number | boolean | string | null>;
-type PowertrainSchema = Record<string, DeviceSchema>;
-type CustomModulesSchema = Record<string, DeviceSchema>;
-
-export interface ScreenDataSchema {
-  electrics?: ElectricsSchema;
-  powertrain?: PowertrainSchema;
-  customModules?: CustomModulesSchema;
-}
-
-type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
-type ScreenDataInstance<T extends ScreenDataSchema> = DeepWriteable<T>;
-
-export interface SifOptions {
-  enableHover?: boolean;
-}
-
 class ScreenInputHandler {
-  screenWidth: number;
-  screenHeight: number;
-  screenId: string | null;
-  enableHover: boolean;
-  lastHoverElement: Element | null;
-  hoveredElements: Element[];
-  lastMouseMoveTime: number;
-  mouseMoveThrottle: number;
-
-  constructor(
-    screenWidth: number,
-    screenHeight: number,
-    screenId: string | null = null
-  ) {
+  constructor(screenWidth, screenHeight, screenId = null) {
     this.screenWidth = screenWidth;
     this.screenHeight = screenHeight;
     this.screenId = screenId;
@@ -98,9 +9,8 @@ class ScreenInputHandler {
     this.lastMouseMoveTime = 0;
     this.mouseMoveThrottle = 1; // was 11ms. throttled way less cause it seems to make no difference anyway?
   }
-
-  getDownstreamChain(element: Element | null): Element[] {
-    const chain: Element[] = [];
+  getDownstreamChain(element) {
+    const chain = [];
     let current = element;
     while (current && current !== document.body) {
       chain.push(current);
@@ -108,23 +18,19 @@ class ScreenInputHandler {
     }
     return chain;
   }
-
   /**
    * Main event handler called from Lua
    * @param {CoordinateEventData} eventData - Event data from BeamNG coordinate system
    */
-  handleEvent(eventData: CoordinateEventData) {
+  handleEvent(eventData) {
     const { type, x, y, screenId, button, deltaX, deltaY, pixelX, pixelY } =
       eventData;
-
     // Convert normalized coordinates to pixels if needed
     const clientX =
       pixelX !== undefined ? pixelX : Math.floor(x * this.screenWidth);
     const clientY =
       pixelY !== undefined ? pixelY : Math.floor(y * this.screenHeight);
-
     const element = document.elementFromPoint(clientX, clientY);
-
     switch (type) {
       case "click":
         this.handleClick(element, clientX, clientY, button);
@@ -152,10 +58,8 @@ class ScreenInputHandler {
         break;
     }
   }
-
-  handleClick(element: Element | null, x: number, y: number, button: number) {
+  handleClick(element, x, y, button) {
     if (!element) return;
-
     const event = new MouseEvent("click", {
       bubbles: true,
       cancelable: true,
@@ -164,18 +68,10 @@ class ScreenInputHandler {
       button: button,
       view: window,
     });
-
     element.dispatchEvent(event);
   }
-
-  handleMouseDown(
-    element: Element | null,
-    x: number,
-    y: number,
-    button: number
-  ) {
+  handleMouseDown(element, x, y, button) {
     if (!element) return;
-
     const event = new MouseEvent("mousedown", {
       bubbles: true,
       cancelable: true,
@@ -184,13 +80,10 @@ class ScreenInputHandler {
       button: button,
       view: window,
     });
-
     element.dispatchEvent(event);
   }
-
-  handleMouseUp(element: Element | null, x: number, y: number, button: number) {
+  handleMouseUp(element, x, y, button) {
     if (!element) return;
-
     const event = new MouseEvent("mouseup", {
       bubbles: true,
       cancelable: true,
@@ -199,17 +92,14 @@ class ScreenInputHandler {
       button: button,
       view: window,
     });
-
     element.dispatchEvent(event);
   }
-
-  handleMouseMove(element: Element | null, x: number, y: number) {
+  handleMouseMove(element, x, y) {
     // Manual hover tracking needed because CSS :hover doesn't activate
     // when we synthesize events from coordinate data
     if (element !== this.lastHoverElement) {
       const newChain = element ? this.getDownstreamChain(element) : [];
       const oldChain = this.hoveredElements;
-
       // Remove .hovered from elements no longer in the chain
       if (this.enableHover) {
         for (const el of oldChain) {
@@ -218,7 +108,6 @@ class ScreenInputHandler {
           }
         }
       }
-
       // Dispatch leave event to previous direct element only
       if (this.lastHoverElement && !newChain.includes(this.lastHoverElement)) {
         const leaveEvent = new MouseEvent("mouseleave", {
@@ -230,7 +119,6 @@ class ScreenInputHandler {
         });
         this.lastHoverElement.dispatchEvent(leaveEvent);
       }
-
       // Add .hovered to new elements in the chain
       if (this.enableHover) {
         for (const el of newChain) {
@@ -239,7 +127,6 @@ class ScreenInputHandler {
           }
         }
       }
-
       // Dispatch enter event to new direct element only
       if (element && !oldChain.includes(element)) {
         const enterEvent = new MouseEvent("mouseenter", {
@@ -251,11 +138,9 @@ class ScreenInputHandler {
         });
         element.dispatchEvent(enterEvent);
       }
-
       this.lastHoverElement = element;
       this.hoveredElements = newChain;
     }
-
     // Throttle mousemove events to 30fps to reduce overhead
     const now = Date.now();
     if (element && now - this.lastMouseMoveTime >= this.mouseMoveThrottle) {
@@ -270,19 +155,15 @@ class ScreenInputHandler {
       element.dispatchEvent(moveEvent);
     }
   }
-
-  handleMouseEnter(element: Element | null, x: number, y: number) {
+  handleMouseEnter(element, x, y) {
     if (!element) return;
-
     const newChain = this.getDownstreamChain(element);
-
     // Add .hovered to element and all downstream elements
     if (this.enableHover) {
       for (const el of newChain) {
         el.classList.add("hovered");
       }
     }
-
     const event = new MouseEvent("mouseenter", {
       bubbles: false,
       cancelable: true,
@@ -290,21 +171,17 @@ class ScreenInputHandler {
       clientY: y,
       view: window,
     });
-
     element.dispatchEvent(event);
     this.lastHoverElement = element;
     this.hoveredElements = newChain;
   }
-
-  handleMouseLeave(element: Element | null, x: number, y: number) {
+  handleMouseLeave(element, x, y) {
     if (!element) return;
-
     if (this.enableHover) {
       for (const el of this.hoveredElements) {
         el.classList.remove("hovered");
       }
     }
-
     const event = new MouseEvent("mouseleave", {
       bubbles: false,
       cancelable: true,
@@ -312,21 +189,12 @@ class ScreenInputHandler {
       clientY: y,
       view: window,
     });
-
     element.dispatchEvent(event);
     this.lastHoverElement = null;
     this.hoveredElements = [];
   }
-
-  handleDrag(
-    element: Element | null,
-    x: number,
-    y: number,
-    deltaX: number,
-    deltaY: number
-  ) {
+  handleDrag(element, x, y, deltaX, deltaY) {
     if (!element) return;
-
     const event = new MouseEvent("drag", {
       bubbles: true,
       cancelable: true,
@@ -334,21 +202,16 @@ class ScreenInputHandler {
       clientY: y,
       view: window,
     });
-
     // Add delta properties (readonly, need defineProperty)
     Object.defineProperty(event, "deltaX", { value: deltaX });
     Object.defineProperty(event, "deltaY", { value: deltaY });
-
     element.dispatchEvent(event);
   }
-
-  handleWheel(element: Element | null, x: number, y: number, deltaY: number) {
+  handleWheel(element, x, y, deltaY) {
     if (!element) return;
-
     if (!isFinite(deltaY)) {
       return;
     }
-
     // WheelEvent constructor doesn't accept clientX/clientY directly in CEF
     // Create event with proper delta values and deltaMode, then set coordinates
     const event = new WheelEvent("wheel", {
@@ -358,24 +221,19 @@ class ScreenInputHandler {
       deltaMode: WheelEvent.DOM_DELTA_PIXEL,
       view: window,
     });
-
     // Set coordinate properties (readonly, need defineProperty)
     Object.defineProperty(event, "clientX", { value: x });
     Object.defineProperty(event, "clientY", { value: y });
-
     element.dispatchEvent(event);
-
     // Synthetic events don't trigger default browser scrolling
     // Manually scroll the element or its scrollable parent
-
     if (!event.defaultPrevented) {
-      let scrollTarget: Element | null = element;
+      let scrollTarget = element;
       while (scrollTarget && scrollTarget !== document.body) {
         const style = window.getComputedStyle(scrollTarget);
         const isScrollable =
           (style.overflowY === "scroll" || style.overflowY === "auto") &&
           scrollTarget.scrollHeight > scrollTarget.clientHeight;
-
         if (isScrollable) {
           scrollTarget.scrollTop += deltaY;
           break;
@@ -385,10 +243,8 @@ class ScreenInputHandler {
     }
   }
 }
-
 // Global handler instance
-let handler: ScreenInputHandler | null = null;
-
+let handler = null;
 /**
  * Initialize the screen input handler.
  *
@@ -408,11 +264,7 @@ let handler: ScreenInputHandler | null = null;
  * @param {Object} [options] - { enableHover: boolean }
  */
 window.initScreenInput = function (width, height, screenId, options) {
-  let resolvedWidth: number,
-    resolvedHeight: number,
-    resolvedScreenId: string | null | undefined,
-    resolvedOptions: SifOptions | undefined;
-
+  let resolvedWidth, resolvedHeight, resolvedScreenId, resolvedOptions;
   // legacy: accept a config object as first argument
   if (
     width !== null &&
@@ -420,52 +272,50 @@ window.initScreenInput = function (width, height, screenId, options) {
     typeof width === "object" &&
     "displayWidth" in width
   ) {
-    const config = width as SifConfig;
-    resolvedWidth = config.displayWidth as number;
-    resolvedHeight = config.displayHeight as number;
+    const config = width;
+    resolvedWidth = config.displayWidth;
+    resolvedHeight = config.displayHeight;
     resolvedScreenId = config.screenId;
-    resolvedOptions = height as unknown as SifOptions;
+    resolvedOptions = height;
   } else {
     // shorthand for options only
     if (width !== null && width !== undefined && typeof width === "object") {
-      options = width as unknown as SifOptions;
+      options = width;
       width = undefined;
     }
     const cfg = window._sifConfig || {};
-    resolvedWidth = (
-      width !== null && width !== undefined ? width : cfg.displayWidth
-    ) as number;
-    resolvedHeight = (
-      height !== null && typeof height === "number" ? height : cfg.displayHeight
-    ) as number;
+    resolvedWidth =
+      width !== null && width !== undefined ? width : cfg.displayWidth;
+    resolvedHeight =
+      height !== null && typeof height === "number"
+        ? height
+        : cfg.displayHeight;
     resolvedScreenId =
       screenId !== null && screenId !== undefined
         ? screenId
-        : cfg.screenId ?? null;
+        : (cfg.screenId ?? null);
     resolvedOptions = options;
   }
-
   handler = new ScreenInputHandler(
     resolvedWidth,
     resolvedHeight,
-    resolvedScreenId || null
+    resolvedScreenId || null,
   );
   if (resolvedOptions && resolvedOptions.enableHover === true) {
     handler.enableHover = true;
   }
 };
-
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
 const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
   window,
-  "setup"
+  "setup",
 );
 if (!_originalSetupDescriptor) {
   Object.defineProperty(window, "setup", {
     set(fn) {
       Object.defineProperty(window, "setup", {
-        value: function (config: any) {
-          (window as any)._sifConfig = config;
+        value: function (config) {
+          window._sifConfig = config;
           fn(config);
         },
         writable: true,
@@ -475,7 +325,6 @@ if (!_originalSetupDescriptor) {
     configurable: true,
   });
 }
-
 // Namespace for Lua-called functions
 window.screenInput = {
   /**
@@ -484,7 +333,6 @@ window.screenInput = {
    */
   onInput: function (eventData) {
     const eventScreenId = eventData?.screenId;
-
     if (!handler) {
       if (eventScreenId) {
         return;
@@ -492,7 +340,6 @@ window.screenInput = {
       console.warn("screenInput: Handler not set up yet");
       return;
     }
-
     if (
       handler.screenId &&
       eventScreenId &&
@@ -500,10 +347,8 @@ window.screenInput = {
     ) {
       return;
     }
-
     handler.handleEvent(eventData);
   },
-
   /**
    * Call a custom Lua function in the vehicle controller
    *
@@ -537,19 +382,16 @@ window.screenInput = {
       console.warn("beamng.sendEngineLua not available");
       return;
     }
-
     const argsJson = JSON.stringify(args || {});
     beamng.sendEngineLua(
-      `screenService.callVehicleLua("${functionName}", jsonDecode('${argsJson}'))`
+      `screenService.callVehicleLua("${functionName}", jsonDecode('${argsJson}'))`,
     );
   },
-
   /**
    * Called when cursor enters/leaves the screen trigger box
    * Rarely needed. Coordinate events handle most use cases
    */
   onHover: function (data) {},
-
   /**
    * Trigger event handler called from Lua
    * Dispatches custom events for physical triggers
@@ -565,7 +407,6 @@ window.screenInput = {
     if (!eventData || !eventData.id) {
       return;
     }
-
     // Dispatch as custom event so HTML pages can use addEventListener
     const event = new CustomEvent("beamng:trigger", {
       detail: eventData,
@@ -573,7 +414,6 @@ window.screenInput = {
       cancelable: true,
     });
     document.dispatchEvent(event);
-
     // Also dispatch action-specific events for convenience
     if (eventData.action) {
       const actionEvent = new CustomEvent(
@@ -582,13 +422,12 @@ window.screenInput = {
           detail: eventData,
           bubbles: true,
           cancelable: true,
-        }
+        },
       );
       document.dispatchEvent(actionEvent);
     }
   },
 };
-
 //------------------------------------------------------------------
 // DATA SAVING API
 //------------------------------------------------------------------
@@ -610,7 +449,6 @@ window.screenInput = {
 // It's complex, but also simplifies downstream building by providing
 // native logic and handling.
 //------------------------------------------------------------------
-
 /**
  * Save data to persistent storage
  *
@@ -632,13 +470,7 @@ window.screenInput = {
  * // Save user-specific data (for login/profile systems)
  * persistSave("preferences", { seat: "memory1" }, "user", "john_doe");
  */
-function persistSave(
-  filename: string,
-  data: any,
-  scope?: string,
-  userId?: string,
-  identifier?: string
-) {
+function persistSave(filename, data, scope, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -646,17 +478,14 @@ function persistSave(
     console.warn("beamng.sendEngineLua not available");
     return;
   }
-
   const jsonStr = JSON.stringify(data);
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-
   beamng.sendEngineLua(
-    `screenService.persistSave("${filename}", jsonDecode('${jsonStr}'), "${safeScope}", ${safeUserId}, ${safeIdentifier})`
+    `screenService.persistSave("${filename}", jsonDecode('${jsonStr}'), "${safeScope}", ${safeUserId}, ${safeIdentifier})`,
   );
 }
-
 /**
  * Load data from persistent storage
  * Returns data via callback since Lua->JS is asynchronous
@@ -667,13 +496,7 @@ function persistSave(
  * @param {string} [userId] - User identifier (for "user" scope)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistLoad(
-  filename: string,
-  callback: (data: any) => void,
-  scope?: string,
-  userId?: string,
-  identifier?: string
-) {
+function persistLoad(filename, callback, scope, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -682,7 +505,6 @@ function persistLoad(
     if (callback) callback(null);
     return;
   }
-
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
@@ -691,27 +513,23 @@ function persistLoad(
     Date.now() +
     "_" +
     Math.random().toString(36).substr(2, 9);
-
   // Create temporary callback with 30s timeout
-  (window as any)[callbackId] = function (data: any) {
-    delete (window as any)[callbackId];
+  window[callbackId] = function (data) {
+    delete window[callbackId];
     if (callback) callback(data);
   };
-
   // Cleanup after 30 seconds if callback never fires
   setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
+    if (window[callbackId]) {
+      delete window[callbackId];
       console.warn(`Callback ${callbackId} timed out after 30s`);
       if (callback) callback(null);
     }
   }, 30000);
-
   beamng.sendEngineLua(
-    `screenService.persistLoad("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistLoad("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
-
 /**
  * Check if a data file exists
  *
@@ -721,13 +539,7 @@ function persistLoad(
  * @param {string} [userId] - User identifier (for "user" scope)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistExists(
-  filename: string,
-  callback: (exists: boolean | string) => void,
-  scope?: string,
-  userId?: string,
-  identifier?: string
-) {
+function persistExists(filename, callback, scope, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -736,7 +548,6 @@ function persistExists(
     if (callback) callback(false);
     return;
   }
-
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
@@ -745,26 +556,22 @@ function persistExists(
     Date.now() +
     "_" +
     Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (exists: boolean | string) {
-    delete (window as any)[callbackId];
+  window[callbackId] = function (exists) {
+    delete window[callbackId];
     if (callback) callback(exists === true || exists === "true");
   };
-
   // Cleanup after 30 seconds if callback never fires
   setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
+    if (window[callbackId]) {
+      delete window[callbackId];
       console.warn(`Callback ${callbackId} timed out after 30s`);
       if (callback) callback(false);
     }
   }, 30000);
-
   beamng.sendEngineLua(
-    `screenService.persistExists("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistExists("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
-
 /**
  * Delete a data file
  *
@@ -773,12 +580,7 @@ function persistExists(
  * @param {string} [userId] - User identifier (for "user" scope)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistDelete(
-  filename: string,
-  scope?: string,
-  userId?: string,
-  identifier?: string
-) {
+function persistDelete(filename, scope, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -786,22 +588,19 @@ function persistDelete(
     console.warn("beamng.sendEngineLua not available");
     return;
   }
-
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-
   beamng.sendEngineLua(
-    `screenService.persistDelete("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`
+    `screenService.persistDelete("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`,
   );
 }
-
 /**
  * Get the current vehicle's license plate
  *
  * @param {function} callback - Function to call with license plate string (or null)
  */
-function getLicensePlate(callback: (plate: string | null) => void) {
+function getLicensePlate(callback) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -810,30 +609,25 @@ function getLicensePlate(callback: (plate: string | null) => void) {
     if (callback) callback(null);
     return;
   }
-
   const callbackId =
     "_cefPlateCallback_" +
     Date.now() +
     "_" +
     Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (plate: string | null) {
-    delete (window as any)[callbackId];
+  window[callbackId] = function (plate) {
+    delete window[callbackId];
     if (callback) callback(plate);
   };
-
   // Cleanup after 30 seconds if callback never fires
   setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
+    if (window[callbackId]) {
+      delete window[callbackId];
       console.warn(`Callback ${callbackId} timed out after 30s`);
       if (callback) callback(null);
     }
   }, 30000);
-
   beamng.sendEngineLua(`screenService.getLicensePlate("${callbackId}");`);
 }
-
 /**
  * List all user IDs that have saved data for a specific file on this identifier
  *
@@ -841,11 +635,7 @@ function getLicensePlate(callback: (plate: string | null) => void) {
  * @param {function} callback - Function to call with array of user IDs
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistListUsers(
-  filename: string,
-  callback: (users: string[]) => void,
-  identifier?: string
-) {
+function persistListUsers(filename, callback, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -854,33 +644,28 @@ function persistListUsers(
     if (callback) callback([]);
     return;
   }
-
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
   const callbackId =
     "_persistUsersCallback_" +
     Date.now() +
     "_" +
     Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (users: string[]) {
-    delete (window as any)[callbackId];
+  window[callbackId] = function (users) {
+    delete window[callbackId];
     if (callback) callback(users || []);
   };
-
   // Cleanup after 30 seconds if callback never fires
   setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
+    if (window[callbackId]) {
+      delete window[callbackId];
       console.warn(`Callback ${callbackId} timed out after 30s`);
       if (callback) callback([]);
     }
   }, 30000);
-
   beamng.sendEngineLua(
-    `screenService.persistListUsers("${filename}", ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistListUsers("${filename}", ${safeIdentifier}, "${callbackId}")`,
   );
 }
-
 /**
  * Register factory defaults for a settings file
  * Factory defaults are immutable - they persist as the "reset to defaults" baseline
@@ -888,7 +673,7 @@ function persistListUsers(
  * @param {string} filename - JSON file name
  * @param {object} defaults - Default values object
  */
-function persistRegisterDefaults(filename: string, defaults: any) {
+function persistRegisterDefaults(filename, defaults) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -896,13 +681,11 @@ function persistRegisterDefaults(filename: string, defaults: any) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
-
   const jsonStr = JSON.stringify(defaults);
   beamng.sendEngineLua(
-    `screenService.persistRegisterDefaults("${filename}", jsonDecode('${jsonStr}'))`
+    `screenService.persistRegisterDefaults("${filename}", jsonDecode('${jsonStr}'))`,
   );
 }
-
 /**
  * Create factory defaults file if it doesn't exist
  * Uses previously registered defaults or provided defaults
@@ -910,7 +693,7 @@ function persistRegisterDefaults(filename: string, defaults: any) {
  * @param {string} filename - JSON file name
  * @param {object} [defaults] - Optional defaults to use (overrides registered defaults)
  */
-function persistInitDefaults(filename: string, defaults?: any) {
+function persistInitDefaults(filename, defaults) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -918,17 +701,15 @@ function persistInitDefaults(filename: string, defaults?: any) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
-
   if (defaults) {
     const jsonStr = JSON.stringify(defaults);
     beamng.sendEngineLua(
-      `screenService.persistInitDefaults("${filename}", jsonDecode('${jsonStr}'))`
+      `screenService.persistInitDefaults("${filename}", jsonDecode('${jsonStr}'))`,
     );
   } else {
     beamng.sendEngineLua(`screenService.persistInitDefaults("${filename}")`);
   }
 }
-
 /**
  * Reset settings at a specific scope back to factory defaults
  * Deletes the scope's file, causing it to fall back to lower-priority scopes
@@ -938,12 +719,7 @@ function persistInitDefaults(filename: string, defaults?: any) {
  * @param {string} [userId] - User identifier (required when scope is "user")
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistResetToFactory(
-  filename: string,
-  scope?: string,
-  userId?: string,
-  identifier?: string
-) {
+function persistResetToFactory(filename, scope, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -951,15 +727,13 @@ function persistResetToFactory(
     console.warn("beamng.sendEngineLua not available");
     return;
   }
-
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
   beamng.sendEngineLua(
-    `screenService.persistResetToFactory("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`
+    `screenService.persistResetToFactory("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`,
   );
 }
-
 /**
  * Load settings with recursive hierarchical merging
  * Merges: factory -> global -> identifier -> user
@@ -976,12 +750,7 @@ function persistResetToFactory(
  * @param {string} [userId] - User identifier (adds user scope to merge)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistLoadMerged(
-  filename: string,
-  callback: (data: any, sources: any) => void,
-  userId?: string,
-  identifier?: string
-) {
+function persistLoadMerged(filename, callback, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -990,7 +759,6 @@ function persistLoadMerged(
     if (callback) callback(null, null);
     return;
   }
-
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
   const callbackId =
@@ -998,26 +766,22 @@ function persistLoadMerged(
     Date.now() +
     "_" +
     Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (data: any, sources: any) {
-    delete (window as any)[callbackId];
+  window[callbackId] = function (data, sources) {
+    delete window[callbackId];
     if (callback) callback(data, sources);
   };
-
   // Cleanup after 30 seconds if callback never fires
   setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
+    if (window[callbackId]) {
+      delete window[callbackId];
       console.warn(`Callback ${callbackId} timed out after 30s`);
       if (callback) callback(null, null);
     }
   }, 30000);
-
   beamng.sendEngineLua(
-    `screenService.persistLoadMerged("${filename}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistLoadMerged("${filename}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
-
 /**
  * Get which scope a specific setting key came from
  *
@@ -1027,13 +791,7 @@ function persistLoadMerged(
  * @param {string} [userId] - User identifier (includes user scope in search)
  * @param {string} [identifier] - Custom identifier (defaults to license plate)
  */
-function persistGetSource(
-  filename: string,
-  key: string,
-  callback: (source: string | null) => void,
-  userId?: string,
-  identifier?: string
-) {
+function persistGetSource(filename, key, callback, userId, identifier) {
   if (
     typeof beamng === "undefined" ||
     typeof beamng.sendEngineLua !== "function"
@@ -1042,7 +800,6 @@ function persistGetSource(
     if (callback) callback(null);
     return;
   }
-
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
   const callbackId =
@@ -1050,164 +807,53 @@ function persistGetSource(
     Date.now() +
     "_" +
     Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (source: string | null) {
-    delete (window as any)[callbackId];
+  window[callbackId] = function (source) {
+    delete window[callbackId];
     if (callback) callback(source);
   };
-
   // Cleanup after 30 seconds if callback never fires
   setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
+    if (window[callbackId]) {
+      delete window[callbackId];
       console.warn(`Callback ${callbackId} timed out after 30s`);
       if (callback) callback(null);
     }
   }, 30000);
-
   beamng.sendEngineLua(
-    `screenService.persistGetSource("${filename}", "${key}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistGetSource("${filename}", "${key}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
-
 // Handler for async callbacks from Lua via screenInput
-(window as any).persistCallback = function (callbackData: PersistCallbackData) {
+window.persistCallback = function (callbackData) {
   const { type, callbackId, data, sources } = callbackData;
-
-  if ((window as any)[callbackId]) {
+  if (window[callbackId]) {
     if (type === "loaded") {
-      (window as any)[callbackId](data);
+      window[callbackId](data);
     } else if (type === "merged") {
-      (window as any)[callbackId](data, sources);
+      window[callbackId](data, sources);
     } else if (type === "exists") {
-      (window as any)[callbackId](data);
+      window[callbackId](data);
     } else if (type === "plate") {
-      (window as any)[callbackId](data);
+      window[callbackId](data);
     } else if (type === "users") {
-      (window as any)[callbackId](data);
+      window[callbackId](data);
     } else if (type === "source") {
-      (window as any)[callbackId](data);
+      window[callbackId](data);
     }
   }
 };
-
-/**
- * @tsExclusive **[ This feature is only available on the TypeScript version of ScreenInput! ]**
- *
- * Declare which vehicle data your screen needs.
- * Subscribes to electrics, powertrain devices, and custom modules
- * Returns a typed object kept up to date automatically on each updateData() call
- *
- * @param {ScreenDataSchema} schema - Data your screen uses (include default values!)
- *
- * @example
- * const data = defineScreenData({
- *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
- *   powertrain: {
- *     mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
- *     gearbox: { gearIndex: 0 }
- *   },
- *   customModules: {
- *     combustionEngineData: { currentPower: 0, currentTorque: 0 }
- *   }
- * });
- *
- * window.updateData = () => {
- *   document.getElementById("rpm").textContent = data.electrics.rpm;
- *   document.getElementById("torque").textContent = data.powertrain.mainEngine.outputTorque1;
- *   document.getElementById("power").textContent = data.customModules.combustionEngineData.currentPower;
- * };
- */
-function defineScreenData<T extends ScreenDataSchema>(
-  schema: T
-): ScreenDataInstance<T> {
-  const instance = JSON.parse(JSON.stringify(schema)) as ScreenDataInstance<T>;
-
-  if (
-    typeof beamng !== "undefined" &&
-    typeof beamng.sendEngineLua === "function"
-  ) {
-    const sub: Record<string, any> = {};
-
-    if (schema.electrics) {
-      sub.electrics = Object.keys(schema.electrics);
-    }
-
-    // build header-table format [["deviceName","property"], ["engine","rpm"], ...]
-    if (schema.powertrain) {
-      const rows: string[][] = [["deviceName", "property"]];
-      for (const deviceName of Object.keys(schema.powertrain)) {
-        for (const property of Object.keys(schema.powertrain[deviceName])) {
-          rows.push([deviceName, property]);
-        }
-      }
-      sub.powertrain = rows;
-    }
-
-    if (schema.customModules) {
-      const rows: string[][] = [["moduleName", "property"]];
-      for (const moduleName of Object.keys(schema.customModules)) {
-        for (const property of Object.keys(schema.customModules[moduleName])) {
-          rows.push([moduleName, property]);
-        }
-      }
-      sub.customModules = rows;
-    }
-
-    const json = JSON.stringify(sub);
-    beamng.sendEngineLua(
-      `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`
-    );
-  }
-
-  // Install updateData wrapper after setup() returns so user's assignment is captured
-  setTimeout(() => {
-    const userUpdateData = window.updateData;
-    window.updateData = (incoming: any) => {
-      if (incoming.electrics)
-        Object.assign(instance.electrics as object, incoming.electrics);
-      if (incoming.powertrain) {
-        for (const device of Object.keys(incoming.powertrain)) {
-          if (instance.powertrain && (instance.powertrain as any)[device]) {
-            Object.assign(
-              (instance.powertrain as any)[device],
-              incoming.powertrain[device]
-            );
-          }
-        }
-      }
-      if (incoming.customModules) {
-        for (const mod of Object.keys(incoming.customModules)) {
-          if (instance.customModules && (instance.customModules as any)[mod]) {
-            Object.assign(
-              (instance.customModules as any)[mod],
-              incoming.customModules[mod]
-            );
-          }
-        }
-      }
-      if (userUpdateData) userUpdateData(incoming);
-    };
-  }, 0);
-
-  return instance;
-}
-
-(window as any).defineScreenData = defineScreenData;
-
 // Export for global use
-(window as any).persistSave = persistSave;
-(window as any).persistLoad = persistLoad;
-(window as any).persistExists = persistExists;
-(window as any).persistDelete = persistDelete;
-(window as any).getLicensePlate = getLicensePlate;
-(window as any).persistListUsers = persistListUsers;
-(window as any).persistRegisterDefaults = persistRegisterDefaults;
-(window as any).persistInitDefaults = persistInitDefaults;
-(window as any).persistResetToFactory = persistResetToFactory;
-(window as any).persistLoadMerged = persistLoadMerged;
-(window as any).persistGetSource = persistGetSource;
-
+window.persistSave = persistSave;
+window.persistLoad = persistLoad;
+window.persistExists = persistExists;
+window.persistDelete = persistDelete;
+window.getLicensePlate = getLicensePlate;
+window.persistListUsers = persistListUsers;
+window.persistRegisterDefaults = persistRegisterDefaults;
+window.persistInitDefaults = persistInitDefaults;
+window.persistResetToFactory = persistResetToFactory;
+window.persistLoadMerged = persistLoadMerged;
+window.persistGetSource = persistGetSource;
 /**
  * Call a custom Lua function registered in the vehicle controller
  *
@@ -1217,11 +863,7 @@ function defineScreenData<T extends ScreenDataSchema>(
  * @example
  * callVehicleLua("playSound", { sound: "click", volume: 0.8 });
  */
-(window as any).callVehicleLua = function (
-  functionName: string,
-  args: unknown
-) {
+window.callVehicleLua = function (functionName, args) {
   window.screenInput.callLua(functionName, args);
 };
-
 // mrow~
