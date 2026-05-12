@@ -87,7 +87,7 @@ class ScreenInputHandler {
   constructor(
     screenWidth: number,
     screenHeight: number,
-    screenId: string | null = null
+    screenId: string | null = null,
   ) {
     this.screenWidth = screenWidth;
     this.screenHeight = screenHeight;
@@ -172,7 +172,7 @@ class ScreenInputHandler {
     element: Element | null,
     x: number,
     y: number,
-    button: number
+    button: number,
   ) {
     if (!element) return;
 
@@ -323,7 +323,7 @@ class ScreenInputHandler {
     x: number,
     y: number,
     deltaX: number,
-    deltaY: number
+    deltaY: number,
   ) {
     if (!element) return;
 
@@ -441,24 +441,29 @@ window.initScreenInput = function (width, height, screenId, options) {
     resolvedScreenId =
       screenId !== null && screenId !== undefined
         ? screenId
-        : cfg.screenId ?? null;
+        : (cfg.screenId ?? null);
     resolvedOptions = options;
   }
 
   handler = new ScreenInputHandler(
     resolvedWidth,
     resolvedHeight,
-    resolvedScreenId || null
+    resolvedScreenId || null,
   );
   if (resolvedOptions && resolvedOptions.enableHover === true) {
     handler.enableHover = true;
   }
 };
 
+// Safe no-ops so BeamNG callbacks never fire into undefined before other scripts load
+// (bit of a hack if you ask me, but it works)
+if (!window.updateData) window.updateData = function () {};
+if (!window.updateMode) window.updateMode = function () {};
+
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
 const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
   window,
-  "setup"
+  "setup",
 );
 if (!_originalSetupDescriptor) {
   Object.defineProperty(window, "setup", {
@@ -540,7 +545,7 @@ window.screenInput = {
 
     const argsJson = JSON.stringify(args || {});
     beamng.sendEngineLua(
-      `screenService.callVehicleLua("${functionName}", jsonDecode('${argsJson}'))`
+      `screenService.callVehicleLua("${functionName}", jsonDecode('${argsJson}'))`,
     );
   },
 
@@ -582,7 +587,7 @@ window.screenInput = {
           detail: eventData,
           bubbles: true,
           cancelable: true,
-        }
+        },
       );
       document.dispatchEvent(actionEvent);
     }
@@ -637,7 +642,7 @@ function persistSave(
   data: any,
   scope?: string,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -653,7 +658,7 @@ function persistSave(
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
 
   beamng.sendEngineLua(
-    `screenService.persistSave("${filename}", jsonDecode('${jsonStr}'), "${safeScope}", ${safeUserId}, ${safeIdentifier})`
+    `screenService.persistSave("${filename}", jsonDecode('${jsonStr}'), "${safeScope}", ${safeUserId}, ${safeIdentifier})`,
   );
 }
 
@@ -672,7 +677,7 @@ function persistLoad(
   callback: (data: any) => void,
   scope?: string,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -708,7 +713,7 @@ function persistLoad(
   }, 30000);
 
   beamng.sendEngineLua(
-    `screenService.persistLoad("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistLoad("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
 
@@ -726,7 +731,7 @@ function persistExists(
   callback: (exists: boolean | string) => void,
   scope?: string,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -761,7 +766,7 @@ function persistExists(
   }, 30000);
 
   beamng.sendEngineLua(
-    `screenService.persistExists("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistExists("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
 
@@ -777,7 +782,7 @@ function persistDelete(
   filename: string,
   scope?: string,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -792,7 +797,7 @@ function persistDelete(
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
 
   beamng.sendEngineLua(
-    `screenService.persistDelete("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`
+    `screenService.persistDelete("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`,
   );
 }
 
@@ -844,7 +849,7 @@ function getLicensePlate(callback: (plate: string | null) => void) {
 function persistListUsers(
   filename: string,
   callback: (users: string[]) => void,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -877,7 +882,7 @@ function persistListUsers(
   }, 30000);
 
   beamng.sendEngineLua(
-    `screenService.persistListUsers("${filename}", ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistListUsers("${filename}", ${safeIdentifier}, "${callbackId}")`,
   );
 }
 
@@ -899,7 +904,7 @@ function persistRegisterDefaults(filename: string, defaults: any) {
 
   const jsonStr = JSON.stringify(defaults);
   beamng.sendEngineLua(
-    `screenService.persistRegisterDefaults("${filename}", jsonDecode('${jsonStr}'))`
+    `screenService.persistRegisterDefaults("${filename}", jsonDecode('${jsonStr}'))`,
   );
 }
 
@@ -922,7 +927,7 @@ function persistInitDefaults(filename: string, defaults?: any) {
   if (defaults) {
     const jsonStr = JSON.stringify(defaults);
     beamng.sendEngineLua(
-      `screenService.persistInitDefaults("${filename}", jsonDecode('${jsonStr}'))`
+      `screenService.persistInitDefaults("${filename}", jsonDecode('${jsonStr}'))`,
     );
   } else {
     beamng.sendEngineLua(`screenService.persistInitDefaults("${filename}")`);
@@ -942,7 +947,7 @@ function persistResetToFactory(
   filename: string,
   scope?: string,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -956,7 +961,7 @@ function persistResetToFactory(
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
   beamng.sendEngineLua(
-    `screenService.persistResetToFactory("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`
+    `screenService.persistResetToFactory("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier})`,
   );
 }
 
@@ -980,7 +985,7 @@ function persistLoadMerged(
   filename: string,
   callback: (data: any, sources: any) => void,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -1014,7 +1019,7 @@ function persistLoadMerged(
   }, 30000);
 
   beamng.sendEngineLua(
-    `screenService.persistLoadMerged("${filename}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistLoadMerged("${filename}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
 
@@ -1032,7 +1037,7 @@ function persistGetSource(
   key: string,
   callback: (source: string | null) => void,
   userId?: string,
-  identifier?: string
+  identifier?: string,
 ) {
   if (
     typeof beamng === "undefined" ||
@@ -1066,7 +1071,7 @@ function persistGetSource(
   }, 30000);
 
   beamng.sendEngineLua(
-    `screenService.persistGetSource("${filename}", "${key}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`
+    `screenService.persistGetSource("${filename}", "${key}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
   );
 }
 
@@ -1119,7 +1124,7 @@ function persistGetSource(
  * };
  */
 function defineScreenData<T extends ScreenDataSchema>(
-  schema: T
+  schema: T,
 ): ScreenDataInstance<T> {
   const instance = JSON.parse(JSON.stringify(schema)) as ScreenDataInstance<T>;
 
@@ -1156,7 +1161,7 @@ function defineScreenData<T extends ScreenDataSchema>(
 
     const json = JSON.stringify(sub);
     beamng.sendEngineLua(
-      `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`
+      `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
     );
   }
 
@@ -1171,7 +1176,7 @@ function defineScreenData<T extends ScreenDataSchema>(
           if (instance.powertrain && (instance.powertrain as any)[device]) {
             Object.assign(
               (instance.powertrain as any)[device],
-              incoming.powertrain[device]
+              incoming.powertrain[device],
             );
           }
         }
@@ -1181,7 +1186,7 @@ function defineScreenData<T extends ScreenDataSchema>(
           if (instance.customModules && (instance.customModules as any)[mod]) {
             Object.assign(
               (instance.customModules as any)[mod],
-              incoming.customModules[mod]
+              incoming.customModules[mod],
             );
           }
         }
@@ -1219,7 +1224,7 @@ function defineScreenData<T extends ScreenDataSchema>(
  */
 (window as any).callVehicleLua = function (
   functionName: string,
-  args: unknown
+  args: unknown,
 ) {
   window.screenInput.callLua(functionName, args);
 };
