@@ -281,23 +281,10 @@
           </div>
         </div>
         <div class="content-body" data-page="info">
-          <div class="content-header">Vehicle Data</div>
-          <p style="font-size: 12px; line-height: 1.8; color: #aaa">
-            Live vehicle data via <code>defineScreenData</code>:
+          <div class="content-header">Information</div>
+          <p style="font-size: 12px; line-height: 1.8">
+            <strong>There is no more information</strong><br /><br />
           </p>
-          <table style="font-family: monospace; font-size: 14px; border-collapse: collapse; width: 100%">
-            <tr style="background:#2a2a2a"><td colspan="2" style="padding: 4px 10px; color: #ffffff; font-size: 11px">ELECTRICS</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">RPM</td><td id="data-rpm" style="padding: 6px 10px">-</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Gear</td><td id="data-gear" style="padding: 6px 10px">-</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Wheel Speed</td><td id="data-wheelspeed" style="padding: 6px 10px">-</td></tr>
-            <tr style="background:#2a2a2a"><td colspan="2" style="padding: 4px 10px; color: #ffffff; font-size: 11px">POWERTRAIN</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Engine Torque</td><td id="data-torque" style="padding: 6px 10px">-</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Engine Load</td><td id="data-load" style="padding: 6px 10px">-</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Gear Index</td><td id="data-gearindex" style="padding: 6px 10px">-</td></tr>
-            <tr style="background:#2a2a2a"><td colspan="2" style="padding: 4px 10px; color: #ffffff; font-size: 11px">CUSTOM MODULES</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Power</td><td id="data-power" style="padding: 6px 10px">-</td></tr>
-            <tr><td style="padding: 6px 10px; color: #ffffff">Torque</td><td id="data-ctorque" style="padding: 6px 10px">-</td></tr>
-          </table>
         </div>
 
         <div class="back-button" id="back-btn">← BACK TO HOME</div>
@@ -305,11 +292,8 @@
     </div>
 
     <!-- Screen Input Framework - Shared library from screenInput mod -->
-    <script src="/ui/lib/ext/sucrase/sucrase.js"></script>
-    <script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
+    <script src="/ui/modules/screenInput.js"></script>
     <script>
-    loadTS("/ui/modules/screenInput.ts")
-      .then(function () {
 
       let currentPage = "home";
       const menuItems = document.querySelectorAll(".menu-item");
@@ -404,23 +388,8 @@
       window.setup = function (config) {
         window.initScreenInput({enableHover: true});
       };
-
-      window.updateData = function () {
-        const d = window.vehicleData;
-        if (!d) return;
-        document.getElementById("data-rpm").textContent = Math.round(d.electrics.rpm) + " rpm";
-        document.getElementById("data-gear").textContent = d.electrics.gear;
-        document.getElementById("data-wheelspeed").textContent = (d.electrics.wheelspeed * 3.6).toFixed(1) + " km/h";
-        document.getElementById("data-torque").textContent = d.powertrain.mainEngine.outputTorque1.toFixed(1) + " Nm";
-        document.getElementById("data-load").textContent = (d.powertrain.mainEngine.instantEngineLoad * 100).toFixed(0) + "%";
-        document.getElementById("data-gearindex").textContent = d.powertrain.gearbox.gearIndex;
-        document.getElementById("data-power").textContent = d.customModules.combustionEngineData.currentPower.toFixed(1) + " hp";
-        document.getElementById("data-ctorque").textContent = d.customModules.combustionEngineData.currentTorque.toFixed(1) + " Nm";
-      };
+      window.updateData = function (data) {};
       window.updateMode = function (data) {};
-
-      return loadTS("/vehicles/vivace/vivace_infotainment/vehicleData.ts");
-    }); // end loadTS
     </script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-/// <reference path="../../../ui/modules/beamng.d.ts" />
+/// <reference path="../../../../ui/modules/beamng.d.ts" />
 
 export const vehicleData = defineScreenData({
   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
@@ -10,5 +10,3 @@ export const vehicleData = defineScreenData({
     combustionEngineData: { currentPower: 0, currentTorque: 0 }
   }
 });
-
-(window as any).vehicleData = vehicleData;
