@@ -1,3 +1,18 @@
+/**
+ * !!! DO NOT EDIT MANUALLY !!!
+ *
+ * sneppy snep snep!
+ *
+ * Be warned (!!!!): using this code means you give
+ *     away your soul to the snow leopard gods!
+ *
+ * Translates BeamNG coordinate events to browser-like events
+ *
+ * Part of the screenInput framework - makes vehicle HTML displays actually usable
+ * by converting 3D raycasts into standard DOM events. Effectively allows the HTML
+ * to treat coordinate input as if it was running on a tablet, but also provides
+ * the flexibility to handle more complex interactions when needed.
+ */
 class ScreenInputHandler {
   constructor(screenWidth, screenHeight, screenId = null) {
     this.screenWidth = screenWidth;
