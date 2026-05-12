@@ -8,7 +8,7 @@ Making HTML screens in BeamNG actually usable by translating 3D raycasts into st
 
 ## The Origin Story
 
-This framework evolved from DaddelZeit's CCF interactive screen system. The original implementation was groundbreaking but had limitations - no rotation support, tedious trigger placement, and each trigger represented a single button that had to be manually positioned. 
+This framework evolved from DaddelZeit's CCF interactive screen system. The original implementation was groundbreaking but had limitations - no rotation support, tedious trigger placement, and each trigger represented a single button that had to be manually positioned.
 
 The breakthrough came when I realized coordinate hell could be solved with reference planes. Instead of this:
 
@@ -103,9 +103,9 @@ In `vehicles/yourcar/interactive_screen/`, create:
     {
       "id": "0",
       "pos": { "x": 0.25, "y": -0.15, "z": 0.85 },
-      "rot": { "x": -15, "y": 0, "z": 0 }
-    }
-  ]
+      "rot": { "x": -15, "y": 0, "z": 0 },
+    },
+  ],
 }
 ```
 
@@ -120,9 +120,9 @@ In `vehicles/yourcar/interactive_screen/`, create:
       "screenId": "your_screen_material",
       "pos": { "x": 0.0, "y": 0.0, "z": 0.0 },
       "scale": 0.2,
-      "refPlane": "0"
-    }
-  ]
+      "refPlane": "0",
+    },
+  ],
 }
 ```
 
@@ -139,7 +139,7 @@ Add the script tag to your HTML file:
 Call `initScreenInput` inside your `setup()` callback:
 
 ```javascript
-window.setup = function(config) {
+window.setup = function (config) {
   window.initScreenInput();
 };
 ```
@@ -169,7 +169,9 @@ Complimentary JSDoc included.
 
 ## Examples
 
-- **Vivace** - Working example in `vehicles/vivace/vivace_infotainment/`
+- **Vivace** - Working examples in `vehicles/vivace/vivace_infotainment/`
+  - `js_example/` - JavaScript
+  - `ts_example/` - TypeScript with multi-file imports
 
 ---
 

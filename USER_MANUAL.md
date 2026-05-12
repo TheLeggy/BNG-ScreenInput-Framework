@@ -97,7 +97,9 @@ becomes
 <script src="/ui/modules/screenInput.js"></script>
 <script src="/ui/lib/ext/sucrase/sucrase.js"></script>
 <script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
-<script>loadTS("/vehicles/yourcar/interactive_screen/typescript_infotainment.ts");</script>
+<script>
+  loadTS("/vehicles/yourcar/interactive_screen/typescript_infotainment.ts");
+</script>
 ```
 
 Your TypeScript file works like any other screen script. Wire up the BeamNG callbacks directly inside it:
@@ -116,7 +118,7 @@ A few things worth knowing:
 
 - Types are stripped away when loading, so there is no type checking at runtime. Use your editor for that.
 - Some types will need to be declared manually. Several base game and the framework's types are included in a definitions file. See the [TypeScript](#typescript) section below for details.
-- `export`/`import` statements are handled and named exports land on `window` automatically.
+- `export`/`import` statements are fully supported. Named exports from a loaded file land on `window` automatically, and relative imports (`import { yourExport } from "./other"`) work across TypeScript files.
 - `import type` is fully safe to use.
 - `displayData` is used differently in the TypeScript setup. See the [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript) section for details.
 
@@ -138,7 +140,7 @@ Reference planes define coordinate origins for your trigger boxes and volumes. T
 {
   "$configType": "referencePlane",
   "pos": { "x": 0.25, "y": -0.15, "z": 0.85 },
-  "rot": { "x": -15, "y": 0, "z": 0 }
+  "rot": { "x": -15, "y": 0, "z": 0 },
 }
 ```
 
@@ -151,14 +153,14 @@ Reference planes define coordinate origins for your trigger boxes and volumes. T
     {
       "id": "0",
       "pos": { "x": 0.25, "y": -0.15, "z": 0.85 },
-      "rot": { "x": -15, "y": 0, "z": 0 }
+      "rot": { "x": -15, "y": 0, "z": 0 },
     },
     {
       "id": "console",
       "pos": { "x": 0.15, "y": -0.2, "z": 0.75 },
-      "rot": { "x": 0, "y": 0, "z": 0 }
-    }
-  ]
+      "rot": { "x": 0, "y": 0, "z": 0 },
+    },
+  ],
 }
 ```
 
@@ -198,9 +200,9 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
       "rot": { "x": 0, "y": 0, "z": 0 },
       "refPlane": "0",
       "translateX": 0.0,
-      "translateY": 0.0
-    }
-  ]
+      "translateY": 0.0,
+    },
+  ],
 }
 ```
 
@@ -241,9 +243,9 @@ Trigger volumes are physical 3D spaces that detect interaction events (press, cl
       "pos": { "x": 0.05, "y": -0.02, "z": -0.08 },
       "size": { "x": 0.02, "y": 0.01, "z": 0.02 },
       "rot": { "x": 0, "y": 0, "z": 0 },
-      "refPlane": "console"
-    }
-  ]
+      "refPlane": "console",
+    },
+  ],
 }
 ```
 
@@ -293,15 +295,18 @@ To get vehicle data (like speed, RPM, gear, etc.) into your HTML display, you us
 **In your jbeam screen configuration, add displayData to the newScreen controller entry:**
 
 ```json
-["newScreen", {
-  "screenId": "your_screen_material",
-  "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
-  "displayWidth": 1920,
-  "displayHeight": 1080,
-  "displayData": {
-    "electrics": ["wheelspeed", "rpm", "gear"]
+[
+  "newScreen",
+  {
+    "screenId": "your_screen_material",
+    "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080,
+    "displayData": {
+      "electrics": ["wheelspeed", "rpm", "gear"]
+    }
   }
-}]
+]
 ```
 
 **In your HTML, implement the callback functions:**
@@ -332,11 +337,11 @@ const data = defineScreenData({
   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
   powertrain: {
     mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
-    gearbox: { gearIndex: 0 }
+    gearbox: { gearIndex: 0 },
   },
   customModules: {
-    combustionEngineData: { currentPower: 0, currentTorque: 0 }
-  }
+    combustionEngineData: { currentPower: 0, currentTorque: 0 },
+  },
 });
 
 window.setup = (config) => {
@@ -344,10 +349,16 @@ window.setup = (config) => {
 };
 
 window.updateData = () => {
-  document.getElementById("rpm").textContent = String(Math.round(data.electrics.rpm));
-  document.getElementById("speed").textContent = (data.electrics.wheelspeed * 3.6).toFixed(0);
-  document.getElementById("torque").textContent = data.powertrain.mainEngine.outputTorque1.toFixed(1);
-  document.getElementById("power").textContent = data.customModules.combustionEngineData.currentPower.toFixed(1);
+  document.getElementById("rpm").textContent = String(
+    Math.round(data.electrics.rpm),
+  );
+  document.getElementById("speed").textContent = (
+    data.electrics.wheelspeed * 3.6
+  ).toFixed(0);
+  document.getElementById("torque").textContent =
+    data.powertrain.mainEngine.outputTorque1.toFixed(1);
+  document.getElementById("power").textContent =
+    data.customModules.combustionEngineData.currentPower.toFixed(1);
 };
 ```
 
@@ -524,34 +535,28 @@ document.addEventListener("beamng:trigger:click", function (event) {
 
 The sections above apply equally to TypeScript screens. A few things behave differently:
 
-**Callback assignment** - assign at module scope. `loadTS` guarantees the file finishes executing before BeamNG calls anything, so there's no need to wrap assignments in an init function.
-
-**Asynchronous Execution & Guard Clauses** - Because `loadTS()` promises fetch files asynchronously over the network, files loaded later in the chain will not be immediately available on `window`. Since BeamNG's UI ticks continuously, it will likely drop an update cycle calling `window.updateData` before a module finishes network transfer and merges into the global scope. To prevent `TypeError: undefined` crashes, explicitly guard your update assignments:
-
-```typescript
-window.updateData = () => {
-    if (!window.vehicleData) return; // Wait until vehicleData.ts merges
-    document.getElementById("rpm").textContent = window.vehicleData.electrics.rpm;
-}
-```
+**Callback assignment** - assign at module scope. The framework installs no-op defaults for `updateData` and `updateMode` so BeamNG never calls into undefined while your script is still loading.
 
 **Vehicle data** - use `defineScreenData()` instead of reading from the `updateData` parameter. See [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript).
 
-**Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Since this framework compiles your code on the fly without needing a complex `tsconfig.json` setup, your editor (like VS Code) won't automatically know what `defineScreenData`, `window.vehicleData`, or the standard `beamng` globals actually are. 
+**Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Since this framework compiles your code on the fly without needing a complex `tsconfig.json` setup, your editor (like VS Code) won't automatically know what `defineScreenData`, `window.vehicleData`, or the standard `beamng` globals actually are.
 
 To fix "Cannot find name" errors, eliminate red squiggly lines, and get full autocompletion, you must explicitly link the `.d.ts` file so your editor can find it.
 
 There are three primary ways to do this:
 
 1. **Local Copy (Recommended)** - Copy the `beamng.d.ts` file from `ui/modules/` directly into your vehicle's screen folder next to your `.ts` scripts. Then just link it like this at line 1 of every `.ts` file:
+
    ```typescript
    /// <reference path="./beamng.d.ts" />
    ```
 
 2. **Relative Path** - Point directly back to the framework's core file from your vehicle folder's depth at the top of every file. Depending on how many folders deep you are, it looks something like this:
+
    ```typescript
    /// <reference path="../../../../ui/modules/beamng.d.ts" />
    ```
+
    Note: You will need to unpack the Screen Input framework into your mod folder to use this method.
 
 3. **`tsconfig.json` (Cleanest / Advanced)** - If you don't want to copy files or add triple-slash references to the top of every single script, you can create a standard `tsconfig.json` file in your mod's root folder. This tells VS Code (or your IDE of choice) exactly where to find the framework types globally:
@@ -562,13 +567,9 @@ There are three primary ways to do this:
        "lib": ["es2022", "dom"],
        "moduleResolution": "node"
      },
-     "include": [
-       "**/*.ts",
-       "ui/modules/beamng.d.ts"
-     ]
+     "include": ["**/*.ts", "ui/modules/beamng.d.ts"]
    }
    ```
-
 
 Because the Sucrase compiler strips out TypeScript types and comments before sending code to the browser engine, these triple-slash references are strictly for your editor to help you code.
 
@@ -636,7 +637,7 @@ persistLoad(
       applySettings(data);
     }
   },
-  "global"
+  "global",
 );
 ```
 
@@ -668,7 +669,7 @@ persistLoadMerged(
       document.getElementById("theme-reset").style.display = "block";
     }
   },
-  "john_doe"
+  "john_doe",
 );
 ```
 
@@ -688,7 +689,7 @@ persistExists(
       // Create default trip data
     }
   },
-  "identifier"
+  "identifier",
 );
 ```
 
@@ -749,7 +750,7 @@ persistListUsers(
   function (users) {
     console.log("Available users:", users);
   },
-  identifier
+  identifier,
 );
 ```
 
@@ -772,7 +773,7 @@ persistGetSource(
   function (source) {
     console.log("Theme setting came from:", source); // "factory", "global", "identifier", or "user"
   },
-  "john_doe"
+  "john_doe",
 );
 ```
 
@@ -972,7 +973,7 @@ Your HTML display can update dynamically using standard web technologies:
 // Update from vehicle data
 function updateData(data) {
   document.getElementById("speed").textContent = Math.round(
-    data.electrics.wheelspeed * 3.6
+    data.electrics.wheelspeed * 3.6,
   );
   document.getElementById("gear").textContent = data.electrics.gear;
 }
@@ -1082,7 +1083,12 @@ See `vehicles/vivace/vivace_infotainment/` for a complete working example with:
 - Multiple trigger volumes for physical buttons
 - Test menu HTML demonstrating the API
 
-This example covers all the core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
+Two variants of said test menu are included:
+
+- `js_example/` - HTML with inline JavaScript
+- `ts_example/` - TypeScript with `defineScreenData` and multi-file imports
+
+Both share the same config files at the `vivace_infotainment/` root. The examples cover all core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
 
 ---
 
