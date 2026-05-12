@@ -139,22 +139,21 @@ local function detectMouseEvent()
     return "mousemove", nil
 
     -- TODO: look back at middle and right click events
-    -- TODO: look again at synthetic mousedown/mouseup around drag sequences so screens relying on the
-    --       standard mousedown -> mousemove -> mouseup pattern work without needing a separate
-    --       "drag" event listener
+    -- TODO: also wouldn't hurt to look at Pointer Events API
 end
 
 --------------------------------------------------------------------
 -- COMMUNICATION
 --------------------------------------------------------------------
 
-local lastCoordinateEventData
+local lastDragPixelX = nil
+local lastDragPixelY = nil
+local dragSequenceActive = false
 local function sendCoordinateEvent(eventData)
     if not vehicle then
         return
     end
 
-    lastCoordinateEventData = eventData
     -- Send coordinate event to all screen controllers
     vehicle:queueLuaCommand([[
         local eventData = lpack.decode("]] .. lpack.encode(eventData) .. [[")
@@ -623,6 +622,11 @@ local function onUpdate(dt)
     if not vehicle or not vehicle.getPosition or not boxes[1] then
         return
     end
+    if dragSequenceActive and not ui_imgui.IsMouseDown(0) then
+        dragSequenceActive = false
+        lastDragPixelX = nil
+        lastDragPixelY = nil
+    end
     local ray = getCameraMouseRay()
 
     local matFromRot = vehicle:getRefNodeMatrix()
@@ -760,8 +764,30 @@ local function onUpdate(dt)
                     eventData.button = button
                 end
                 if eventType == "drag" then
-                    eventData.deltaX = eventData.pixelX - (lastCoordinateEventData.pixelX or 0)
-                    eventData.deltaY = eventData.pixelY - (lastCoordinateEventData.pixelY or 0)
+                    if not dragSequenceActive then
+                        sendCoordinateEvent({
+                            type = "mousedown",
+                            x = cx,
+                            y = cy,
+                            screenId = v.screenId,
+                            button = button or 0,
+                            pixelX = eventData.pixelX,
+                            pixelY = eventData.pixelY
+                        })
+                        dragSequenceActive = true
+                    end
+
+                    eventData.type = "mousemove"
+
+                    lastDragPixelX = eventData.pixelX
+                    lastDragPixelY = eventData.pixelY
+                elseif eventType == "mouseup" then
+                    dragSequenceActive = false
+                    lastDragPixelX = nil
+                    lastDragPixelY = nil
+                elseif eventType == "click" then
+                    lastDragPixelX = eventData.pixelX
+                    lastDragPixelY = eventData.pixelY
                 end
 
                 if eventType == "wheel" and mouseWheel then
@@ -1089,6 +1115,9 @@ local function onVehicleDestroyed(vid)
         triggerStates = {}
         refPlaneCache = {}
         lastHoveredBoxId = nil
+        dragSequenceActive = false
+        lastDragPixelX = nil
+        lastDragPixelY = nil
     end
     registeredVehicles[vid] = nil
     if not next(registeredVehicles) then

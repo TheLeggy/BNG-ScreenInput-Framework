@@ -26,12 +26,25 @@ window.screenInput.onInput = function (eventData) {
 
 const scrollContainer = document.getElementById("scroll-test");
 if (scrollContainer) {
+  let scrollDragActive = false;
+  let lastScrollY = 0;
+
+  scrollContainer.addEventListener("mousedown", (e: MouseEvent) => {
+    scrollDragActive = true;
+    lastScrollY = e.clientY;
+  });
+  document.addEventListener("mousemove", (e: MouseEvent) => {
+    if (!scrollDragActive) return;
+    const deltaY = e.clientY - lastScrollY;
+    lastScrollY = e.clientY;
+    scrollContainer.scrollTop -= deltaY;
+    lastAction.textContent = "Drag scroll";
+  });
+  document.addEventListener("mouseup", () => {
+    scrollDragActive = false;
+  });
   scrollContainer.addEventListener("wheel", (e: any) => {
     lastAction.textContent = `Scrolled: ${e.deltaY.toFixed(0)}`;
-  });
-  scrollContainer.addEventListener("drag", (e: any) => {
-    scrollContainer.scrollTop -= (e.deltaY || 0) * 0.25;
-    lastAction.textContent = `Drag scroll`;
   });
 }
 
@@ -59,18 +72,44 @@ actionButtons.forEach((button) => {
 
 const draggableBoxes = document.querySelectorAll<HTMLElement>(".draggable-box");
 const boxPos: Record<string, { x: number; y: number }> = {};
+let activeDragBox: HTMLElement | null = null;
+let activeDragBoxId: string | null = null;
+let lastDragX = 0;
+let lastDragY = 0;
+
 draggableBoxes.forEach((box) => {
   const id = box.dataset.box!;
   boxPos[id] = { x: 0, y: 0 };
-  box.addEventListener("drag", (e: any) => {
+
+  box.addEventListener("mousedown", (e: MouseEvent) => {
+    if (activeDragBox && activeDragBox !== box) {
+      activeDragBox.classList.remove("dragging");
+    }
+    activeDragBox = box;
+    activeDragBoxId = id;
+    lastDragX = e.clientX;
+    lastDragY = e.clientY;
     box.classList.add("dragging");
-    boxPos[id].x += e.deltaX || 0;
-    boxPos[id].y += e.deltaY || 0;
-    box.style.left = boxPos[id].x + "px";
-    box.style.top = boxPos[id].y + "px";
-    lastAction.textContent = `Drag box ${id}`;
   });
-  box.addEventListener("mouseup", () => box.classList.remove("dragging"));
+});
+
+document.addEventListener("mousemove", (e: MouseEvent) => {
+  if (!activeDragBox || !activeDragBoxId) return;
+  boxPos[activeDragBoxId].x += e.clientX - lastDragX;
+  boxPos[activeDragBoxId].y += e.clientY - lastDragY;
+  lastDragX = e.clientX;
+  lastDragY = e.clientY;
+  activeDragBox.style.left = boxPos[activeDragBoxId].x + "px";
+  activeDragBox.style.top = boxPos[activeDragBoxId].y + "px";
+  lastAction.textContent = `Drag box ${activeDragBoxId}`;
+});
+
+document.addEventListener("mouseup", () => {
+  if (activeDragBox) {
+    activeDragBox.classList.remove("dragging");
+  }
+  activeDragBox = null;
+  activeDragBoxId = null;
 });
 
 backButton.addEventListener("click", () => navigateTo("home"));

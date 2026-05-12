@@ -383,7 +383,6 @@ Your HTML display receives standard browser events from the Screen Input system.
 - `mousemove` - Mouse movement, triggers automatic mouseenter/mouseleave
 - `mouseenter` / `mouseleave` - Element hover state (with optional automatic `hovered` class)
 - `wheel` - Mouse wheel scroll
-- `drag` - Drag events with deltaX/deltaY
 
 **Example:**
 
