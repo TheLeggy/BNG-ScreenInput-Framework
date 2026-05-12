@@ -9,3 +9,5 @@ package-lock.json
 # OS generated files
 .DS_Store
 Thumbs.db
+
+BNG-ScreenInput-Framework.code-workspace

@@ -22,14 +22,13 @@ export interface CoordinateEventData {
     | "mousemove"
     | "mouseenter"
     | "mouseleave"
-    | "drag"
     | "wheel";
   x: number;
   y: number;
   screenId?: string;
-  button: number;
-  deltaX: number;
-  deltaY: number;
+  button?: number;
+  deltaX?: number;
+  deltaY?: number;
   pixelX?: number;
   pixelY?: number;
 }
@@ -114,8 +113,7 @@ class ScreenInputHandler {
    * @param {CoordinateEventData} eventData - Event data from BeamNG coordinate system
    */
   handleEvent(eventData: CoordinateEventData) {
-    const { type, x, y, screenId, button, deltaX, deltaY, pixelX, pixelY } =
-      eventData;
+    const { type, x, y, screenId, button, deltaY, pixelX, pixelY } = eventData;
 
     // Convert normalized coordinates to pixels if needed
     const clientX =
@@ -127,13 +125,13 @@ class ScreenInputHandler {
 
     switch (type) {
       case "click":
-        this.handleClick(element, clientX, clientY, button);
+        this.handleClick(element, clientX, clientY, button ?? 0);
         break;
       case "mousedown":
-        this.handleMouseDown(element, clientX, clientY, button);
+        this.handleMouseDown(element, clientX, clientY, button ?? 0);
         break;
       case "mouseup":
-        this.handleMouseUp(element, clientX, clientY, button);
+        this.handleMouseUp(element, clientX, clientY, button ?? 0);
         break;
       case "mousemove":
         this.handleMouseMove(element, clientX, clientY);
@@ -144,11 +142,8 @@ class ScreenInputHandler {
       case "mouseleave":
         this.handleMouseLeave(element, clientX, clientY);
         break;
-      case "drag":
-        this.handleDrag(element, clientX, clientY, deltaX, deltaY);
-        break;
       case "wheel":
-        this.handleWheel(element, clientX, clientY, deltaY);
+        this.handleWheel(element, clientX, clientY, deltaY ?? 0);
         break;
     }
   }
@@ -316,30 +311,6 @@ class ScreenInputHandler {
     element.dispatchEvent(event);
     this.lastHoverElement = null;
     this.hoveredElements = [];
-  }
-
-  handleDrag(
-    element: Element | null,
-    x: number,
-    y: number,
-    deltaX: number,
-    deltaY: number,
-  ) {
-    if (!element) return;
-
-    const event = new MouseEvent("drag", {
-      bubbles: true,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      view: window,
-    });
-
-    // Add delta properties (readonly, need defineProperty)
-    Object.defineProperty(event, "deltaX", { value: deltaX });
-    Object.defineProperty(event, "deltaY", { value: deltaY });
-
-    element.dispatchEvent(event);
   }
 
   handleWheel(element: Element | null, x: number, y: number, deltaY: number) {

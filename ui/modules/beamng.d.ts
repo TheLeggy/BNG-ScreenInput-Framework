@@ -1,11 +1,11 @@
 export interface CoordinateEventData {
-  type: "click" | "mousedown" | "mouseup" | "mousemove" | "mouseenter" | "mouseleave" | "drag" | "wheel";
+  type: "click" | "mousedown" | "mouseup" | "mousemove" | "mouseenter" | "mouseleave" | "wheel";
   x: number;
   y: number;
   screenId?: string;
-  button: number;
-  deltaX: number;
-  deltaY: number;
+  button?: number;
+  deltaX?: number;
+  deltaY?: number;
   pixelX?: number;
   pixelY?: number;
 }

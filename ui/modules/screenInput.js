@@ -1,3 +1,18 @@
+/**
+ * !!! DO NOT EDIT MANUALLY !!!
+ *
+ * sneppy snep snep!
+ *
+ * Be warned (!!!!): using this code means you give
+ *     away your soul to the snow leopard gods!
+ *
+ * Translates BeamNG coordinate events to browser-like events
+ *
+ * Part of the screenInput framework - makes vehicle HTML displays actually usable
+ * by converting 3D raycasts into standard DOM events. Effectively allows the HTML
+ * to treat coordinate input as if it was running on a tablet, but also provides
+ * the flexibility to handle more complex interactions when needed.
+ */
 class ScreenInputHandler {
   constructor(screenWidth, screenHeight, screenId = null) {
     this.screenWidth = screenWidth;
@@ -23,8 +38,7 @@ class ScreenInputHandler {
    * @param {CoordinateEventData} eventData - Event data from BeamNG coordinate system
    */
   handleEvent(eventData) {
-    const { type, x, y, screenId, button, deltaX, deltaY, pixelX, pixelY } =
-      eventData;
+    const { type, x, y, screenId, button, deltaY, pixelX, pixelY } = eventData;
     // Convert normalized coordinates to pixels if needed
     const clientX =
       pixelX !== undefined ? pixelX : Math.floor(x * this.screenWidth);
@@ -33,13 +47,13 @@ class ScreenInputHandler {
     const element = document.elementFromPoint(clientX, clientY);
     switch (type) {
       case "click":
-        this.handleClick(element, clientX, clientY, button);
+        this.handleClick(element, clientX, clientY, button ?? 0);
         break;
       case "mousedown":
-        this.handleMouseDown(element, clientX, clientY, button);
+        this.handleMouseDown(element, clientX, clientY, button ?? 0);
         break;
       case "mouseup":
-        this.handleMouseUp(element, clientX, clientY, button);
+        this.handleMouseUp(element, clientX, clientY, button ?? 0);
         break;
       case "mousemove":
         this.handleMouseMove(element, clientX, clientY);
@@ -50,11 +64,8 @@ class ScreenInputHandler {
       case "mouseleave":
         this.handleMouseLeave(element, clientX, clientY);
         break;
-      case "drag":
-        this.handleDrag(element, clientX, clientY, deltaX, deltaY);
-        break;
       case "wheel":
-        this.handleWheel(element, clientX, clientY, deltaY);
+        this.handleWheel(element, clientX, clientY, deltaY ?? 0);
         break;
     }
   }
@@ -193,20 +204,6 @@ class ScreenInputHandler {
     this.lastHoverElement = null;
     this.hoveredElements = [];
   }
-  handleDrag(element, x, y, deltaX, deltaY) {
-    if (!element) return;
-    const event = new MouseEvent("drag", {
-      bubbles: true,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      view: window,
-    });
-    // Add delta properties (readonly, need defineProperty)
-    Object.defineProperty(event, "deltaX", { value: deltaX });
-    Object.defineProperty(event, "deltaY", { value: deltaY });
-    element.dispatchEvent(event);
-  }
   handleWheel(element, x, y, deltaY) {
     if (!element) return;
     if (!isFinite(deltaY)) {
@@ -305,6 +302,10 @@ window.initScreenInput = function (width, height, screenId, options) {
     handler.enableHover = true;
   }
 };
+// Safe no-ops so BeamNG callbacks never fire into undefined before other scripts load
+// (bit of a hack if you ask me, but it works)
+if (!window.updateData) window.updateData = function () {};
+if (!window.updateMode) window.updateMode = function () {};
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
 const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
   window,
