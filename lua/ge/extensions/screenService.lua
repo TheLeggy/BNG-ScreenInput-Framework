@@ -139,6 +139,9 @@ local function detectMouseEvent()
     return "mousemove", nil
 
     -- TODO: look back at middle and right click events
+    -- TODO: look again at synthetic mousedown/mouseup around drag sequences so screens relying on the
+    --       standard mousedown -> mousemove -> mouseup pattern work without needing a separate
+    --       "drag" event listener
 end
 
 --------------------------------------------------------------------
