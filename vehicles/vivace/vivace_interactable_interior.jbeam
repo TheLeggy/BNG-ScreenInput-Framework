@@ -47,7 +47,7 @@
           ["screenInput", {"triggerConfigPath": "vehicles/vivace/vivace_infotainment/", "drawBoxes":true}],
           ["newScreen", {
               "screenId": "vivace_gps_screen",
-              "htmlPath": "vehicles/vivace/vivace_infotainment/test_menu.html",
+              "htmlPath": "vehicles/vivace/vivace_infotainment/ts_example/ts_test_menu.html",
               "displayWidth": 1024,
               "displayHeight": 512
           }],

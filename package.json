@@ -1,0 +1,13 @@
+{
+  "name": "bng-screeninput-framework",
+  "version": "1.0.0",
+  "description": "A framework for creating interactive vehicle displays with mouse input in BeamNG.drive",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "license": "LicenseRef-BNG-ScreenInput",
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
+  }
+}

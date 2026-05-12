@@ -2,14 +2,14 @@
 -- If a copy of the bCDDL was not distributed with this
 -- file, You can obtain one at http://beamng.com/bCDDL-1.1.txt
 
--- sneppy snep snep! 
+-- sneppy snep snep!
 
--- Be warned (!!!!): using this code means you give  
+-- Be warned (!!!!): using this code means you give
 --    away your soul to the snow leopard gods!
 
 -- universal screen controller for interactive HTML displays
 -- uses effectively the same structure as the base game HTML texture system
--- integrated specifically with screenInput framework 
+-- integrated specifically with screenInput framework
 
 -- to add your own features, I recommend copying this file to a local vehicle folder
 
@@ -35,6 +35,8 @@ local electricsConfig
 local powertrainConfig
 local customModuleConfig
 
+local pendingSubscription = nil
+
 local electricsUpdate = nop
 local powertrainUpdate = nop
 local customModuleUpdate = nop
@@ -46,16 +48,14 @@ local function updateElectricsData(dt)
     end
 end
 
--- Update powertrain data
 local function updatePowertrainData(dt)
     for _, v in ipairs(powertrainConfig) do
         for _, n in ipairs(v.properties) do
-            screenData.powertrain[v.device.name][n] = v.device[n] or 0
+            screenData.powertrain[v.name][n] = v.device[n] or 0
         end
     end
 end
 
--- Update custom module data
 local function updateCustomModuleData(dt)
     for _, module in ipairs(customModuleConfig) do
         module.controller.updateGaugeData(screenData.customModules[module.name], dt)
@@ -88,7 +88,6 @@ local function setupElectricsData(config)
     electricsUpdate = updateElectricsData
 end
 
--- Setup powertrain data sources
 local function setupPowertrainData(config)
     if not config then
         return
@@ -103,10 +102,7 @@ local function setupPowertrainData(config)
     for k, v in pairs(mergedConfig) do
         local device = powertrain.getDevice(k)
         if device then
-            table.insert(powertrainConfig, {
-                device = device,
-                properties = v
-            })
+            table.insert(powertrainConfig, {device = device, name = k, properties = v})
             screenData.powertrain[k] = {}
         end
     end
@@ -114,7 +110,6 @@ local function setupPowertrainData(config)
     powertrainUpdate = updatePowertrainData
 end
 
--- Setup custom module data sources
 local function setupCustomModuleData(config)
     if not config then
         return
@@ -129,16 +124,11 @@ local function setupCustomModuleData(config)
     end
 
     customModuleConfig = {}
-    local controllerPath = "gauges/customModules/"
     for k, v in pairs(mergedConfig) do
-        local c = controller.getController(controllerPath .. k)
+        local c = controller.getController("gauges/customModules/" .. k)
         if c and c.setupGaugeData and c.updateGaugeData then
             c.setupGaugeData(v, htmlTextureInstance)
-            table.insert(customModuleConfig, {
-                controller = c,
-                name = k,
-                properties = v
-            })
+            table.insert(customModuleConfig, {controller = c, name = k, properties = v})
             screenData.customModules[k] = {}
         else
             log("E", "newScreen.setupCustomModuleData", "Can't find controller: " .. k)
@@ -146,6 +136,24 @@ local function setupCustomModuleData(config)
     end
 
     customModuleUpdate = updateCustomModuleData
+end
+
+local function subscribeData(sub)
+    if not htmlTextureInstance then
+        -- dont actually know if we need this but here just in case it goes to shit
+        pendingSubscription = sub
+        return
+    end
+    if sub.electrics then
+        setupElectricsData(sub.electrics)
+        screenData.electrics = {}
+    end
+    if sub.powertrain then
+        setupPowertrainData(sub.powertrain)
+    end
+    if sub.customModules then
+        setupCustomModuleData(sub.customModules)
+    end
 end
 
 local function reset()
@@ -206,11 +214,17 @@ local function initSecondStage(jbeamData)
 
     if screenInput then
         screenInput.addScreen(htmlTextureInstance)
+        screenInput.registerLuaCallback("subscribeData", subscribeData)
     end
 
     setupElectricsData(displayData.electrics)
     setupPowertrainData(displayData.powertrain)
     setupCustomModuleData(displayData.customModules)
+
+    if pendingSubscription then
+        subscribeData(pendingSubscription)
+        pendingSubscription = nil
+    end
 
     local config = {
         uiUnitLength = settings.getValue("uiUnitLength") or "metric",
@@ -259,6 +273,7 @@ M.initSecondStage = initSecondStage
 M.reset = reset
 M.updateGFX = updateGFX
 M.setParameters = setParameters
+M.subscribeData = subscribeData
 
 return M
 

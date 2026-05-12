@@ -9,14 +9,24 @@ This manual covers everything you need to know about using the Screen Input fram
 ## Table of Contents
 
 1. [Setup & Integration](#setup--integration)
+   - [Vehicle Controller Setup](#vehicle-controller-setup)
+   - [HTML Display Setup](#html-display-setup)
 2. [Configuration Files](#configuration-files)
+   - [Trigger Boxes](#trigger-boxes-configtype-triggerboxes)
+   - [Trigger Volumes](#trigger-volumes-configtype-triggers)
+   - [Receiving Vehicle Data](#receiving-vehicle-data)
 3. [JavaScript API](#javascript-api)
+   - [Screen Input Events](#screen-input-events)
+   - [Trigger Events](#trigger-events)
 4. [Data Persistence API](#data-persistence-api)
+   - [Loading with Hierarchical Merging](#loading-with-hierarchical-merging)
 5. [Coordinate Systems](#coordinate-systems)
 6. [Best Practices](#best-practices)
 7. [Advanced Features](#advanced-features)
 8. [Troubleshooting](#troubleshooting)
-9. [Legacy Configuration Format](#legacy-configuration-format)
+9. [Examples](#basic-interactive-screen-vivace)
+10. [Legacy Configuration Format](#legacy-configuration-format)
+11. [License](#license)
 
 ---
 
@@ -70,6 +80,48 @@ window.initScreenInput({ enableHover: true });
 
 After calling `initScreenInput()`, you're done with BeamNG setup. Your display receives browser events and standard web development applies from here. Use vanilla JavaScript, React, Vue, whatever, and build it like you would for a tablet interface.
 
+### TypeScript Support
+
+If you prefer TypeScript, the framework ships a JIT compiler that compiles `.ts` files directly in the vehicle's webview. Alternatively, if you know what you are doing, you can also use your own build process.
+
+To use the included TypeScript compiler, swap out your custom JavaScript file tag for the `loadTS` method of calling it, add the TypeScript runtime scripts, while keeping `screenInput.js`:
+
+```html
+<script src="/ui/modules/screenInput.js"></script>
+<script src="/vehicles/yourcar/interactive_screen/javascript_infotainment.js"></script>
+```
+
+becomes
+
+```html
+<script src="/ui/modules/screenInput.js"></script>
+<script src="/ui/lib/ext/sucrase/sucrase.js"></script>
+<script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
+<script>
+  loadTS("/vehicles/yourcar/interactive_screen/typescript_infotainment.ts");
+</script>
+```
+
+Your TypeScript file works like any other screen script. Wire up the BeamNG callbacks directly inside it:
+
+```typescript
+window.setup = (config) => {
+  window.initScreenInput({ enableHover: true });
+};
+window.updateData = (data) => {};
+window.updateMode = (data) => {};
+```
+
+This also works for split file setups where the HTML is just layout and all logic lives in the `.ts` file. `loadTS` returns a Promise if you need to do anything after the script is ready, but currently, ScreenInput Framework does not have any features that require this.
+
+A few things worth knowing:
+
+- Types are stripped away when loading, so there is no type checking at runtime. Use your editor for that.
+- Some types will need to be declared manually. Several base game and the framework's types are included in a definitions file. See the [TypeScript](#typescript) section below for details.
+- `export`/`import` statements are fully supported. Named exports from a loaded file land on `window` automatically, and relative imports (`import { yourExport } from "./other"`) work across TypeScript files.
+- `import type` is fully safe to use.
+- `displayData` is used differently in the TypeScript setup. See the [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript) section for details.
+
 ---
 
 ## Configuration Files
@@ -88,7 +140,7 @@ Reference planes define coordinate origins for your trigger boxes and volumes. T
 {
   "$configType": "referencePlane",
   "pos": { "x": 0.25, "y": -0.15, "z": 0.85 },
-  "rot": { "x": -15, "y": 0, "z": 0 }
+  "rot": { "x": -15, "y": 0, "z": 0 },
 }
 ```
 
@@ -101,14 +153,14 @@ Reference planes define coordinate origins for your trigger boxes and volumes. T
     {
       "id": "0",
       "pos": { "x": 0.25, "y": -0.15, "z": 0.85 },
-      "rot": { "x": -15, "y": 0, "z": 0 }
+      "rot": { "x": -15, "y": 0, "z": 0 },
     },
     {
       "id": "console",
       "pos": { "x": 0.15, "y": -0.2, "z": 0.75 },
-      "rot": { "x": 0, "y": 0, "z": 0 }
-    }
-  ]
+      "rot": { "x": 0, "y": 0, "z": 0 },
+    },
+  ],
 }
 ```
 
@@ -148,9 +200,9 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
       "rot": { "x": 0, "y": 0, "z": 0 },
       "refPlane": "0",
       "translateX": 0.0,
-      "translateY": 0.0
-    }
-  ]
+      "translateY": 0.0,
+    },
+  ],
 }
 ```
 
@@ -191,9 +243,9 @@ Trigger volumes are physical 3D spaces that detect interaction events (press, cl
       "pos": { "x": 0.05, "y": -0.02, "z": -0.08 },
       "size": { "x": 0.02, "y": 0.01, "z": 0.02 },
       "rot": { "x": 0, "y": 0, "z": 0 },
-      "refPlane": "console"
-    }
-  ]
+      "refPlane": "console",
+    },
+  ],
 }
 ```
 
@@ -243,24 +295,19 @@ To get vehicle data (like speed, RPM, gear, etc.) into your HTML display, you us
 **In your jbeam screen configuration, add displayData to the newScreen controller entry:**
 
 ```json
-["newScreen", {
-  "screenId": "your_screen_material",
-  "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
-  "displayWidth": 1920,
-  "displayHeight": 1080,
-  "displayData": {
-    "electrics": ["propertyName", "..."],
-    "customModules": [["moduleName", "propertyName"]],
-    "powertrain": [["deviceName", "propertyName"]]
+[
+  "newScreen",
+  {
+    "screenId": "your_screen_material",
+    "htmlPath": "vehicles/yourcar/interactive_screen/infotainment.html",
+    "displayWidth": 1920,
+    "displayHeight": 1080,
+    "displayData": {
+      "electrics": ["wheelspeed", "rpm", "gear"]
+    }
   }
-}]
+]
 ```
-
-The `displayData` object specifies which data streams to send to your HTML. Each key accepts any valid properties and/or pairs:
-
-- `"electrics": ["wheelspeed", "rpm", ...]` - Electrics property names
-- `"customModules": [["moduleName", "propertyName"], ...]` - Custom module data as `[module, property]` pairs
-- `"powertrain": [["deviceName", "propertyName"], ...]` - Powertrain data as `[device, property]` pairs
 
 **In your HTML, implement the callback functions:**
 
@@ -270,19 +317,56 @@ window.setup = (setupData) => {};
 
 // Called continuously with live vehicle data
 window.updateData = (data) => {
-  // Access the data streams you requested
   const speed = data.electrics.wheelspeed;
   const rpm = data.electrics.rpm;
   const gear = data.electrics.gear;
-  const temp = data.customModules.environmentData.temperatureEnv;
 
-  // Update your display
   document.getElementById("speed").textContent = Math.round(speed);
   document.getElementById("rpm").textContent = Math.round(rpm);
 };
 ```
 
 **Important note:** This is standard BeamNG functionality and is not limited to the framework
+
+### Receiving Vehicle Data in TypeScript
+
+Screens written in TypeScript can use `defineScreenData()` instead of raw `displayData` in jbeam. It subscribes to `electric`, `powertrain`, and `customModules`, declares them from the screen side with full type inference, and automatically keeps the returned object up to date.
+
+```typescript
+const data = defineScreenData({
+  electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
+  powertrain: {
+    mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
+    gearbox: { gearIndex: 0 },
+  },
+  customModules: {
+    combustionEngineData: { currentPower: 0, currentTorque: 0 },
+  },
+});
+
+window.setup = (config) => {
+  window.initScreenInput({ enableHover: true });
+};
+
+window.updateData = () => {
+  document.getElementById("rpm").textContent = String(
+    Math.round(data.electrics.rpm),
+  );
+  document.getElementById("speed").textContent = (
+    data.electrics.wheelspeed * 3.6
+  ).toFixed(0);
+  document.getElementById("torque").textContent =
+    data.powertrain.mainEngine.outputTorque1.toFixed(1);
+  document.getElementById("power").textContent =
+    data.customModules.combustionEngineData.currentPower.toFixed(1);
+};
+```
+
+`data.electrics.rpm`, `data.powertrain.mainEngine.outputTorque1`, and other returned fields are typed and your editor knows the shape. Unlike in the JavaScript path, where you would need to read from the `updateData` parameter, `data` is already kept up to date.
+
+For `powertrain`, each key is a device name (such as `mainEngine` or `gearbox`) and each nested key is a property on that device. For `customModules`, each key is a controller name under `gauges/customModules/`, and those controllers must be loaded by a jbeam somewhere in the vehicle.
+
+`defineScreenData()` and `displayData` in jbeam are not mutually exclusive. Both route through the same Lua subscriptions, so `defineScreenData()` extends or overrides whatever `displayData` already set up.
 
 ---
 
@@ -447,6 +531,48 @@ document.addEventListener("beamng:trigger:click", function (event) {
 });
 ```
 
+### TypeScript
+
+The sections above apply equally to TypeScript screens. A few things behave differently:
+
+**Callback assignment** - assign at module scope. The framework installs no-op defaults for `updateData` and `updateMode` so BeamNG never calls into undefined while your script is still loading.
+
+**Vehicle data** - use `defineScreenData()` instead of reading from the `updateData` parameter. See [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript).
+
+**Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Since this framework compiles your code on the fly without needing a complex `tsconfig.json` setup, your editor (like VS Code) won't automatically know what `defineScreenData`, `window.vehicleData`, or the standard `beamng` globals actually are.
+
+To fix "Cannot find name" errors, eliminate red squiggly lines, and get full autocompletion, you must explicitly link the `.d.ts` file so your editor can find it.
+
+There are three primary ways to do this:
+
+1. **Local Copy (Recommended)** - Copy the `beamng.d.ts` file from `ui/modules/` directly into your vehicle's screen folder next to your `.ts` scripts. Then just link it like this at line 1 of every `.ts` file:
+
+   ```typescript
+   /// <reference path="./beamng.d.ts" />
+   ```
+
+2. **Relative Path** - Point directly back to the framework's core file from your vehicle folder's depth at the top of every file. Depending on how many folders deep you are, it looks something like this:
+
+   ```typescript
+   /// <reference path="../../../../ui/modules/beamng.d.ts" />
+   ```
+
+   Note: You will need to unpack the Screen Input framework into your mod folder to use this method.
+
+3. **`tsconfig.json` (Cleanest / Advanced)** - If you don't want to copy files or add triple-slash references to the top of every single script, you can create a standard `tsconfig.json` file in your mod's root folder. This tells VS Code (or your IDE of choice) exactly where to find the framework types globally:
+   ```json
+   {
+     "compilerOptions": {
+       "target": "es2022",
+       "lib": ["es2022", "dom"],
+       "moduleResolution": "node"
+     },
+     "include": ["**/*.ts", "ui/modules/beamng.d.ts"]
+   }
+   ```
+
+Because the Sucrase compiler strips out TypeScript types and comments before sending code to the browser engine, these triple-slash references are strictly for your editor to help you code.
+
 ---
 
 ## Data Persistence API
@@ -511,7 +637,7 @@ persistLoad(
       applySettings(data);
     }
   },
-  "global"
+  "global",
 );
 ```
 
@@ -543,7 +669,7 @@ persistLoadMerged(
       document.getElementById("theme-reset").style.display = "block";
     }
   },
-  "john_doe"
+  "john_doe",
 );
 ```
 
@@ -563,7 +689,7 @@ persistExists(
       // Create default trip data
     }
   },
-  "identifier"
+  "identifier",
 );
 ```
 
@@ -624,7 +750,7 @@ persistListUsers(
   function (users) {
     console.log("Available users:", users);
   },
-  identifier
+  identifier,
 );
 ```
 
@@ -647,7 +773,7 @@ persistGetSource(
   function (source) {
     console.log("Theme setting came from:", source); // "factory", "global", "identifier", or "user"
   },
-  "john_doe"
+  "john_doe",
 );
 ```
 
@@ -847,7 +973,7 @@ Your HTML display can update dynamically using standard web technologies:
 // Update from vehicle data
 function updateData(data) {
   document.getElementById("speed").textContent = Math.round(
-    data.electrics.wheelspeed * 3.6
+    data.electrics.wheelspeed * 3.6,
   );
   document.getElementById("gear").textContent = data.electrics.gear;
 }
@@ -957,7 +1083,12 @@ See `vehicles/vivace/vivace_infotainment/` for a complete working example with:
 - Multiple trigger volumes for physical buttons
 - Test menu HTML demonstrating the API
 
-This example covers all the core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
+Two variants of said test menu are included:
+
+- `js_example/` - HTML with inline JavaScript
+- `ts_example/` - TypeScript with `defineScreenData` and multi-file imports
+
+Both share the same config files at the `vivace_infotainment/` root. The examples cover all core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
 
 ---
 
@@ -972,6 +1103,7 @@ The old format used a named block in jbeam to hold the screen configuration:
   ["screenInput", {"drawBoxes": false}],
   ["newScreen", {"name": "your_screen_material"}]
 ],
+"triggerConfigPath": "vehicles/vivace/vivace_infotainment/",
 "your_screen_material": {
   "configuration": {
     "materialName": "@your_screen_material",
