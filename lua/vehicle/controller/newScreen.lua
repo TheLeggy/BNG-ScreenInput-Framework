@@ -25,6 +25,8 @@ local htmlTextureInstance = nil
 
 local updateTimer = 0
 local updateFPS = 90
+local dataUpdateInterval = 1 / 24
+local dataTimer = 0
 local screenData = {
     electrics = {},
     powertrain = {},
@@ -65,14 +67,14 @@ end
 -- Main update loop
 local function updateGFX(dt)
     updateTimer = updateTimer + dt
+    dataTimer = dataTimer + dt
+    if htmlTextureInstance and playerInfo.anyPlayerSeated and dataTimer >= dataUpdateInterval then
+        electricsUpdate(dt)
+        powertrainUpdate(dt)
+        customModuleUpdate(dt)
 
-    if htmlTextureInstance and playerInfo.anyPlayerSeated and obj:getUpdateUIflag() then
-        electricsUpdate(updateTimer)
-        powertrainUpdate(updateTimer)
-        customModuleUpdate(updateTimer)
-
-        htmlTextureInstance:streamJS("updateData", "updateData", screenData)
-        updateTimer = 0
+        htmlTextureInstance:callJS("updateData", screenData)
+        dataTimer = dataTimer - dataUpdateInterval
     end
 end
 
@@ -247,12 +249,12 @@ local function initSecondStage(jbeamData)
     if width and height then
         obj:queueGameEngineLua([[
         if screenService and screenService.configureScreen then
-          screenService.configureScreen("]] .. controllerName .. [[", {
-            width = ]] .. width .. [[,
-            height = ]] .. height .. [[
-          })
-        end
-      ]])
+            screenService.configureScreen("]] .. controllerName .. [[", {
+                width = ]] .. width .. [[,
+                height = ]] .. height .. [[
+            })
+            end
+        ]])
     end
 end
 

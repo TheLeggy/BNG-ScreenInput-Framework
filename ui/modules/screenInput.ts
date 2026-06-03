@@ -427,9 +427,20 @@ window.initScreenInput = function (width, height, screenId, options) {
 };
 
 // Safe no-ops so BeamNG callbacks never fire into undefined before other scripts load
-// (bit of a hack if you ask me, but it works)
-if (!window.updateData) window.updateData = function () {};
 if (!window.updateMode) window.updateMode = function () {};
+// updateData uses a getter/setter so window.updateData is always readable even mid-load.
+if (!Object.getOwnPropertyDescriptor(window, "updateData")?.get) {
+  let _updateDataFn: (incoming: any) => void = function () {};
+  Object.defineProperty(window, "updateData", {
+    get() {
+      return _updateDataFn;
+    },
+    set(fn) {
+      _updateDataFn = fn;
+    },
+    configurable: true,
+  });
+}
 
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
 const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
@@ -437,16 +448,16 @@ const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
   "setup",
 );
 if (!_originalSetupDescriptor) {
+  let _setupFn: (config: any) => void = function () {};
   Object.defineProperty(window, "setup", {
+    get() {
+      return function (config: any) {
+        (window as any)._sifConfig = config;
+        _setupFn(config);
+      };
+    },
     set(fn) {
-      Object.defineProperty(window, "setup", {
-        value: function (config: any) {
-          (window as any)._sifConfig = config;
-          fn(config);
-        },
-        writable: true,
-        configurable: true,
-      });
+      _setupFn = fn;
     },
     configurable: true,
   });
@@ -1136,35 +1147,52 @@ function defineScreenData<T extends ScreenDataSchema>(
     );
   }
 
-  // Install updateData wrapper after setup() returns so user's assignment is captured
-  setTimeout(() => {
-    const userUpdateData = window.updateData;
-    window.updateData = (incoming: any) => {
-      if (incoming.electrics)
-        Object.assign(instance.electrics as object, incoming.electrics);
-      if (incoming.powertrain) {
-        for (const device of Object.keys(incoming.powertrain)) {
-          if (instance.powertrain && (instance.powertrain as any)[device]) {
-            Object.assign(
-              (instance.powertrain as any)[device],
-              incoming.powertrain[device],
-            );
-          }
+  // Intercept window.updateData assignments so the merge wrapper is installed
+  // regardless of when the user assigns their function
+  const _merge = (incoming: any) => {
+    if (incoming.electrics)
+      Object.assign(instance.electrics as object, incoming.electrics);
+    if (incoming.powertrain) {
+      for (const device of Object.keys(incoming.powertrain)) {
+        if (instance.powertrain && (instance.powertrain as any)[device]) {
+          Object.assign(
+            (instance.powertrain as any)[device],
+            incoming.powertrain[device],
+          );
         }
       }
-      if (incoming.customModules) {
-        for (const mod of Object.keys(incoming.customModules)) {
-          if (instance.customModules && (instance.customModules as any)[mod]) {
-            Object.assign(
-              (instance.customModules as any)[mod],
-              incoming.customModules[mod],
-            );
-          }
+    }
+    if (incoming.customModules) {
+      for (const mod of Object.keys(incoming.customModules)) {
+        if (instance.customModules && (instance.customModules as any)[mod]) {
+          Object.assign(
+            (instance.customModules as any)[mod],
+            incoming.customModules[mod],
+          );
         }
       }
-      if (userUpdateData) userUpdateData(incoming);
-    };
-  }, 0);
+    }
+  };
+
+  // Install merge wrapper; persistent getter keeps window.updateData defined during load
+  const _prevFn = window.updateData; // current no-op or prior wrapper
+  window.updateData = function (incoming: any) {
+    _merge(incoming);
+    _prevFn(incoming);
+  };
+
+  // Re-intercept future assignments so the merge wrapper stays in place
+  const _desc = Object.getOwnPropertyDescriptor(window, "updateData")!;
+  const _baseSetter = _desc.set!;
+  Object.defineProperty(window, "updateData", {
+    ..._desc,
+    set(userFn: (incoming: any) => void) {
+      _baseSetter(function (incoming: any) {
+        _merge(incoming);
+        userFn(incoming);
+      });
+    },
+  });
 
   return instance;
 }
