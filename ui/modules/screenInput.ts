@@ -427,7 +427,25 @@ window.initScreenInput = function (width, height, screenId, options) {
 };
 
 // Safe no-ops so BeamNG callbacks never fire into undefined before other scripts load
-if (!window.updateMode) window.updateMode = function () {};
+if (!Object.getOwnPropertyDescriptor(window, "updateMode")?.get) {
+  let _lastUpdateModeArgs: any = undefined;
+  let _updateModeFn: (params: any) => void = function (p: any) {
+    _lastUpdateModeArgs = p;
+  };
+  Object.defineProperty(window, "updateMode", {
+    get() {
+      return _updateModeFn;
+    },
+    set(fn) {
+      _updateModeFn = fn;
+      if (_lastUpdateModeArgs !== undefined) {
+        fn(_lastUpdateModeArgs);
+        _lastUpdateModeArgs = undefined;
+      }
+    },
+    configurable: true,
+  });
+}
 // updateData uses a getter/setter so window.updateData is always readable even mid-load.
 if (!Object.getOwnPropertyDescriptor(window, "updateData")?.get) {
   let _updateDataFn: (incoming: any) => void = function () {};

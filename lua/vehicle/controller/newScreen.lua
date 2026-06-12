@@ -38,6 +38,8 @@ local powertrainConfig
 local customModuleConfig
 
 local pendingSubscription = nil
+local pendingMode = nil
+local modePendingFlush = false
 
 local electricsUpdate = nop
 local powertrainUpdate = nop
@@ -69,6 +71,13 @@ local function updateGFX(dt)
     updateTimer = updateTimer + dt
     dataTimer = dataTimer + dt
     if htmlTextureInstance and playerInfo.anyPlayerSeated and dataTimer >= dataUpdateInterval then
+        if modePendingFlush then
+            if pendingMode then
+                htmlTextureInstance:callJS("updateMode", pendingMode)
+            end
+            modePendingFlush = false
+        end
+
         electricsUpdate(dt)
         powertrainUpdate(dt)
         customModuleUpdate(dt)
@@ -245,6 +254,7 @@ local function initSecondStage(jbeamData)
     }
 
     htmlTextureInstance:callJS("setup", config)
+    modePendingFlush = true
 
     if width and height then
         obj:queueGameEngineLua([[
@@ -260,9 +270,11 @@ end
 
 local function setUIMode(parameters)
     if htmlTextureInstance then
+        pendingMode = parameters
         htmlTextureInstance:callJS("updateMode", parameters)
     end
 end
+
 
 local function setParameters(parameters)
     if parameters.modeName and parameters.modeColor then

@@ -303,7 +303,18 @@ window.initScreenInput = function (width, height, screenId, options) {
   }
 };
 // Safe no-ops so BeamNG callbacks never fire into undefined before other scripts load
-if (!window.updateMode) window.updateMode = function () {};
+if (!Object.getOwnPropertyDescriptor(window, "updateMode")?.get) {
+  let _updateModeFn = function () {};
+  Object.defineProperty(window, "updateMode", {
+    get() {
+      return _updateModeFn;
+    },
+    set(fn) {
+      _updateModeFn = fn;
+    },
+    configurable: true,
+  });
+}
 // updateData uses a getter/setter so window.updateData is always readable even mid-load.
 if (!Object.getOwnPropertyDescriptor(window, "updateData")?.get) {
   let _updateDataFn = function () {};
@@ -329,6 +340,11 @@ if (!_originalSetupDescriptor) {
       return function (config) {
         window._sifConfig = config;
         _setupFn(config);
+        if (config?.screenId && beamng?.sendActiveObjectLua) {
+          beamng.sendActiveObjectLua(
+            `controller.getController(${JSON.stringify(config.screenId)}).onPageReady()`,
+          );
+        }
       };
     },
     set(fn) {
