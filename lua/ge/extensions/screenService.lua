@@ -102,10 +102,8 @@ local function calculateScreenCoordinates(rayHitPos, obb)
     -- Convert from [-1, 1] to [0, 1] normalized coordinates
     -- X is inverted: axis 0 points right-to-left, so we flip it
     -- Y is direct: axis 2 already points top-to-bottom correctly
-    return {
-        x = clamp(1 - (localX + 1) * 0.5, 0, 1),
-        y = clamp((localZ + 1) * 0.5, 0, 1)
-    }
+    -- Returned as a tuple
+    return clamp(1 - (localX + 1) * 0.5, 0, 1), clamp((localZ + 1) * 0.5, 0, 1)
 end
 
 local function normalizedToPixel(normX, normY, width, height)
@@ -146,8 +144,15 @@ end
 -- COMMUNICATION
 --------------------------------------------------------------------
 
-local lastDragPixelX = nil
-local lastDragPixelY = nil
+-- Escape a string for embedding inside a double quoted Lua string literal
+local function escapeLuaString(s)
+    return (s:gsub("\\", "\\\\"):gsub('"', '\\"'))
+end
+
+-- last mousemove sent to the vehicle; used to skip resends while the cursor is still
+local lastMovePixelX = nil
+local lastMovePixelY = nil
+local lastMoveScreenId = nil
 local dragSequenceActive = false
 local function sendCoordinateEvent(eventData)
     if not vehicle then
@@ -156,7 +161,7 @@ local function sendCoordinateEvent(eventData)
 
     -- Send coordinate event to all screen controllers
     vehicle:queueLuaCommand([[
-        local eventData = lpack.decode("]] .. lpack.encode(eventData) .. [[")
+        local eventData = lpack.decode("]] .. escapeLuaString(lpack.encode(eventData)) .. [[")
 
         -- Send to screenInput if it exists (forwards to all screens)
         if screenInput and screenInput.inputCoordinate then
@@ -184,8 +189,8 @@ local function sendTriggerEvent(eventData)
     end
 
     vehicle:queueLuaCommand([[
-        local eventData = lpack.decode("]] .. lpack.encode(eventData) .. [[")
-        
+        local eventData = lpack.decode("]] .. escapeLuaString(lpack.encode(eventData)) .. [[")
+
         -- Send trigger event to screenInput if it exists
         if screenInput and screenInput.onTrigger then
             screenInput.onTrigger(eventData)
@@ -274,6 +279,14 @@ local function defaultRotation(rot)
         return { x = 0, y = 0, z = 0 }
     end
     return rot
+end
+
+-- Rotations are static config data. Build their matrices once at load time
+local function precomputeRotationMatrix(rot)
+    if not rot or (rot.x == 0 and rot.y == 0 and rot.z == 0) then
+        return nil
+    end
+    return buildRotationMatrix(rot)
 end
 
 --------------------------------------------------------------------
@@ -506,12 +519,12 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
                 local dir1Vec = plane1 * math.cos(angle1) + plane2 * math.sin(angle1)
                 local dir1Len = math.sqrt(dir1Vec.x * dir1Vec.x + dir1Vec.y * dir1Vec.y + dir1Vec.z * dir1Vec.z)
                 local dir1 = dir1Len > 0.0001 and vec3(dir1Vec.x / dir1Len, dir1Vec.y / dir1Len, dir1Vec.z / dir1Len) or
-                                 plane1
+                                plane1
 
                 local dir2Vec = plane1 * math.cos(angle2) + plane2 * math.sin(angle2)
                 local dir2Len = math.sqrt(dir2Vec.x * dir2Vec.x + dir2Vec.y * dir2Vec.y + dir2Vec.z * dir2Vec.z)
                 local dir2 = dir2Len > 0.0001 and vec3(dir2Vec.x / dir2Len, dir2Vec.y / dir2Len, dir2Vec.z / dir2Len) or
-                                 plane1
+                                plane1
 
                 local p1 = rotCenter + dir1 * rotRadius
                 local p2 = rotCenter + dir2 * rotRadius
@@ -528,7 +541,7 @@ local function drawReferencePlane(refPlanePos, combinedVehRefRot, planeRot, vehR
 
             local tangentDir = -plane1 * math.sin(arrowAngle) + plane2 * math.cos(arrowAngle)
             local tangentLen = math.sqrt(tangentDir.x * tangentDir.x + tangentDir.y * tangentDir.y + tangentDir.z *
-                                             tangentDir.z)
+                                            tangentDir.z)
             if tangentLen > 0.0001 then
                 tangentDir = vec3(tangentDir.x / tangentLen, tangentDir.y / tangentLen, tangentDir.z / tangentLen)
             end
@@ -617,6 +630,64 @@ local vehRot = quat()
 local vehPos = vec3()
 local obb = OrientedBox3F()
 local boxPos = vec3()
+local _rayHitPos = vec3()
+local frameCounter = 0
+local vehMat = nil -- refnode matrix for the current frame
+
+-- Per frame combined vehicle + plane transform, cached per reference plane
+-- Rotation is composed from the refnode matrix itself
+-- frame counter marks whether an entry has been refreshed this frame yet
+local function getRefPlaneTransform(cacheKey, refPlane)
+    local cached = refPlaneCache[cacheKey]
+    if not cached then
+        cached = {
+            rotQuat = quat(),
+            posOffset = vec3(),
+            frame = -1
+        }
+        refPlaneCache[cacheKey] = cached
+    end
+
+    if cached.frame ~= frameCounter then
+        cached.rotMat = vehMat:copy()
+        if refPlane.rotMat then
+            cached.rotMat:mul(refPlane.rotMat)
+        end
+        cached.rotQuat:set(cached.rotMat:toQuatF())
+        cached.posOffset:set(refPlane.pos)
+        cached.posOffset:setRotate(vehRot)
+        cached.posOffset:setAdd(vehPos)
+        cached.frame = frameCounter
+    end
+
+    return cached
+end
+
+-- Build the world-space obb for a box/trigger into the shared obb
+local function computeOBB(v)
+    local refPlane = getReferencePlane(v.refPlane)
+    local baseMat
+
+    if refPlane then
+        local cached = getRefPlaneTransform(v.refPlane or "default", refPlane)
+        boxPos:set(v.pos)
+        boxPos:setRotate(cached.rotQuat)
+        boxPos:setAdd(cached.posOffset)
+        baseMat = cached.rotMat
+    else
+        boxPos:set(v.pos)
+        boxPos:setRotate(vehRot)
+        boxPos:setAdd(vehPos)
+        baseMat = vehMat
+    end
+
+    local boxMat = baseMat:copy()
+    if v.rotMat then
+        boxMat:mul(v.rotMat)
+    end
+    boxMat:setPosition(boxPos)
+    obb:set2(boxMat, v.size)
+end
 
 local function onUpdate(dt)
     if not vehicle or not vehicle.getPosition or not boxes[1] then
@@ -624,28 +695,20 @@ local function onUpdate(dt)
     end
     if dragSequenceActive and not ui_imgui.IsMouseDown(0) then
         dragSequenceActive = false
-        lastDragPixelX = nil
-        lastDragPixelY = nil
     end
     local ray = getCameraMouseRay()
 
-    local matFromRot = vehicle:getRefNodeMatrix()
-    vehRot:set(matFromRot:toQuatF())
+    vehMat = vehicle:getRefNodeMatrix()
+    vehRot:set(vehMat:toQuatF())
     vehPos:set(vehicle:getPositionXYZ())
 
-    refPlaneCache = {}
+    frameCounter = frameCounter + 1
 
     -- Draw reference planes if debug enabled
     if M.drawBoxes and referencePlanes and next(referencePlanes) then
         for planeId, plane in pairs(referencePlanes) do
-            local refPlaneRotMat = buildRotationMatrix(plane.rot)
-
-            local combinedVehRefRotMat = matFromRot:copy()
-            combinedVehRefRotMat:mul(refPlaneRotMat)
-            local combinedVehRefRot = quat(combinedVehRefRotMat:toQuatF())
-
-            local refPlanePosOffset = vehPos + plane.pos:rotated(vehRot)
-            drawReferencePlane(refPlanePosOffset, combinedVehRefRot, plane.rot, vehRot)
+            local cached = getRefPlaneTransform(planeId, plane)
+            drawReferencePlane(cached.posOffset, cached.rotQuat, plane.rot, vehRot)
         end
     end
 
@@ -669,66 +732,7 @@ local function onUpdate(dt)
             goto continue
         end
 
-        local refPlane = getReferencePlane(v.refPlane)
-        local boxMat = MatrixF(true)
-
-        if refPlane then
-            -- Use cached rotation matrices for this reference plane
-            local cacheKey = v.refPlane or "default"
-            local cached = refPlaneCache[cacheKey]
-
-            if not cached then
-                local refPlaneRotMat = buildRotationMatrix(refPlane.rot)
-
-                local combinedVehRefRotMat = matFromRot:copy()
-                combinedVehRefRotMat:mul(refPlaneRotMat)
-                local combinedVehRefRot = quat(combinedVehRefRotMat:toQuatF())
-                local refPlanePosOffset = vehPos + refPlane.pos:rotated(vehRot)
-
-                cached = {
-                    combinedVehRefRotMat = combinedVehRefRotMat,
-                    combinedVehRefRot = combinedVehRefRot,
-                    refPlanePosOffset = refPlanePosOffset
-                }
-                refPlaneCache[cacheKey] = cached
-            end
-
-            local combinedVehRefRotMat = cached.combinedVehRefRotMat
-            local combinedVehRefRot = cached.combinedVehRefRot
-            local refPlanePosOffset = cached.refPlanePosOffset
-
-            boxPos:set(v.pos)
-            boxPos:setRotate(combinedVehRefRot)
-            boxPos:setAdd(refPlanePosOffset)
-            if v.rot then
-                local localRotMat = buildRotationMatrix(v.rot)
-
-                local combinedMat = combinedVehRefRotMat:copy()
-                combinedMat:mul(localRotMat)
-                boxMat = combinedMat
-                boxMat:setPosition(boxPos)
-            else
-                boxMat:set(combinedVehRefRot)
-                boxMat:setPosition(boxPos)
-            end
-        else
-            boxPos:set(v.pos)
-            boxPos:setRotate(vehRot)
-            boxPos:setAdd(vehPos)
-            if v.rot then
-                local localRotMat = buildRotationMatrix(v.rot)
-
-                local combinedMat = matFromRot:copy()
-                combinedMat:mul(localRotMat)
-                boxMat = combinedMat
-                boxMat:setPosition(boxPos)
-            else
-                boxMat:set(vehRot)
-                boxMat:setPosition(boxPos)
-            end
-        end
-
-        obb:set2(boxMat, v.size)
+        computeOBB(v)
 
         if M.drawBoxes then
             if v.screenId then
@@ -744,25 +748,15 @@ local function onUpdate(dt)
             if screenConfig then
                 currentHoveredBoxId = v.id
 
-                local rayHitPos = ray.pos + ray.dir * dist
-                local coords = calculateScreenCoordinates(rayHitPos, obb)
-                local cx = clamp(coords.x + v.translateX * (coords.x - 0.5), 0, 1)
-                local cy = clamp(coords.y + v.translateY * (coords.y - 0.5), 0, 1)
+                _rayHitPos:set(ray.pos.x + ray.dir.x * dist, ray.pos.y + ray.dir.y * dist,
+                    ray.pos.z + ray.dir.z * dist)
+                local cx, cy = calculateScreenCoordinates(_rayHitPos, obb)
+                cx = clamp(cx + v.translateX * (cx - 0.5), 0, 1)
+                cy = clamp(cy + v.translateY * (cy - 0.5), 0, 1)
                 local eventType, button, mouseWheel = detectMouseEvent()
+                local pixelX, pixelY = normalizedToPixel(cx, cy, screenConfig.width, screenConfig.height)
 
-                local eventData = {
-                    type = eventType,
-                    x = cx,
-                    y = cy,
-                    screenId = v.screenId
-                }
-
-                eventData.pixelX, eventData.pixelY = normalizedToPixel(cx, cy, screenConfig.width,
-                    screenConfig.height)
-
-                if button then
-                    eventData.button = button
-                end
+                local sendType = eventType
                 if eventType == "drag" then
                     if not dragSequenceActive then
                         sendCoordinateEvent({
@@ -771,31 +765,47 @@ local function onUpdate(dt)
                             y = cy,
                             screenId = v.screenId,
                             button = button or 0,
-                            pixelX = eventData.pixelX,
-                            pixelY = eventData.pixelY
+                            pixelX = pixelX,
+                            pixelY = pixelY
                         })
                         dragSequenceActive = true
                     end
-
-                    eventData.type = "mousemove"
-
-                    lastDragPixelX = eventData.pixelX
-                    lastDragPixelY = eventData.pixelY
+                    sendType = "mousemove"
                 elseif eventType == "mouseup" then
                     dragSequenceActive = false
-                    lastDragPixelX = nil
-                    lastDragPixelY = nil
-                elseif eventType == "click" then
-                    lastDragPixelX = eventData.pixelX
-                    lastDragPixelY = eventData.pixelY
                 end
 
-                if eventType == "wheel" and mouseWheel then
-                    eventData.deltaY = mouseWheel * -100
-                    eventData.deltaX = nil
-                end
+                -- Skip resending mousemove while the cursor sits still
+                local isDuplicateMove = sendType == "mousemove" and pixelX == lastMovePixelX and
+                                            pixelY == lastMovePixelY and v.screenId == lastMoveScreenId
 
-                sendCoordinateEvent(eventData)
+                if not isDuplicateMove then
+                    local eventData = {
+                        type = sendType,
+                        x = cx,
+                        y = cy,
+                        screenId = v.screenId,
+                        pixelX = pixelX,
+                        pixelY = pixelY
+                    }
+
+                    if button then
+                        eventData.button = button
+                    end
+                    if eventType == "wheel" and mouseWheel then
+                        eventData.deltaY = mouseWheel * -100
+                    end
+
+                    sendCoordinateEvent(eventData)
+
+                    if sendType == "mousemove" then
+                        lastMovePixelX, lastMovePixelY, lastMoveScreenId = pixelX, pixelY, v.screenId
+                    else
+                        -- Clicks can change the DOM under the cursor. Let the next
+                        -- mousemove through so the JS hover state refreshes
+                        lastMovePixelX, lastMovePixelY, lastMoveScreenId = nil, nil, nil
+                    end
+                end
             end
         end
         ::continue::
@@ -805,66 +815,7 @@ local function onUpdate(dt)
     for k = 1, #triggers do
         local v = triggers[k]
 
-        local refPlane = getReferencePlane(v.refPlane)
-        local boxMat = MatrixF(true)
-
-        if refPlane then
-            -- Use cached rotation matrices for this reference plane
-            local cacheKey = v.refPlane or "default"
-            local cached = refPlaneCache[cacheKey]
-
-            if not cached then
-                local refPlaneRotMat = buildRotationMatrix(refPlane.rot)
-
-                local combinedVehRefRotMat = matFromRot:copy()
-                combinedVehRefRotMat:mul(refPlaneRotMat)
-                local combinedVehRefRot = quat(combinedVehRefRotMat:toQuatF())
-                local refPlanePosOffset = vehPos + refPlane.pos:rotated(vehRot)
-
-                cached = {
-                    combinedVehRefRotMat = combinedVehRefRotMat,
-                    combinedVehRefRot = combinedVehRefRot,
-                    refPlanePosOffset = refPlanePosOffset
-                }
-                refPlaneCache[cacheKey] = cached
-            end
-
-            local combinedVehRefRotMat = cached.combinedVehRefRotMat
-            local combinedVehRefRot = cached.combinedVehRefRot
-            local refPlanePosOffset = cached.refPlanePosOffset
-
-            boxPos:set(v.pos)
-            boxPos:setRotate(combinedVehRefRot)
-            boxPos:setAdd(refPlanePosOffset)
-            if v.rot then
-                local localRotMat = buildRotationMatrix(v.rot)
-
-                local combinedMat = combinedVehRefRotMat:copy()
-                combinedMat:mul(localRotMat)
-                boxMat = combinedMat
-                boxMat:setPosition(boxPos)
-            else
-                boxMat:set(combinedVehRefRot)
-                boxMat:setPosition(boxPos)
-            end
-        else
-            boxPos:set(v.pos)
-            boxPos:setRotate(vehRot)
-            boxPos:setAdd(vehPos)
-            if v.rot then
-                local localRotMat = buildRotationMatrix(v.rot)
-
-                local combinedMat = matFromRot:copy()
-                combinedMat:mul(localRotMat)
-                boxMat = combinedMat
-                boxMat:setPosition(boxPos)
-            else
-                boxMat:set(vehRot)
-                boxMat:setPosition(boxPos)
-            end
-        end
-
-        obb:set2(boxMat, v.size)
+        computeOBB(v)
 
         if M.drawBoxes then
             drawBox(obb, ColorF(0.5, 0, 1, 1))
@@ -889,6 +840,7 @@ local function onUpdate(dt)
             sendHover(currentHoveredBoxId)
         end
         lastHoveredBoxId = currentHoveredBoxId
+        lastMovePixelX, lastMovePixelY, lastMoveScreenId = nil, nil, nil
     end
 end
 
@@ -916,6 +868,7 @@ local function parsePlaneData(planeData, filePath)
         y = planeData.rot.y,
         z = planeData.rot.z
     }
+    plane.rotMat = precomputeRotationMatrix(plane.rot)
 
     return plane
 end
@@ -965,7 +918,7 @@ local function loadBoxes(path)
             if refPlaneData.planes then
                 for i = 1, #refPlaneData.planes do
                     local planeIdStr = refPlaneData.planes[i].id and tostring(refPlaneData.planes[i].id) or
-                                           tostring(i - 1)
+                                            tostring(i - 1)
                     referencePlanes[planeIdStr] = parsePlaneData(refPlaneData.planes[i], refPlanePath)
                 end
             elseif refPlaneData.pos or refPlaneData.rot then
@@ -1006,6 +959,7 @@ local function loadBoxes(path)
                     y = v.rot.y,
                     z = v.rot.z
                 }
+                box.rotMat = precomputeRotationMatrix(box.rot)
                 box.translateX = v.translateX or 0
                 box.translateY = v.translateY or 0
                 cleaned[#cleaned + 1] = box
@@ -1073,6 +1027,7 @@ local function loadTriggers(path)
                 y = v.rot.y,
                 z = v.rot.z
             }
+            trigger.rotMat = precomputeRotationMatrix(trigger.rot)
             cleaned[#cleaned + 1] = trigger
         end
     end
@@ -1092,9 +1047,9 @@ local pendingVehicleLuaCalls = {}
 local function flushPendingVehicleLuaCalls()
     if not vehicle then return end
     for _, call in ipairs(pendingVehicleLuaCalls) do
-        local argsStr = lpack.encode(call.args)
+        local argsStr = escapeLuaString(lpack.encode(call.args))
         vehicle:queueLuaCommand(string.format('screenInput.onLuaCallback("%s", lpack.decode("%s"))', call.functionName,
-            argsStr:gsub('"', '\\"')))
+            argsStr))
     end
     pendingVehicleLuaCalls = {}
 end
@@ -1116,8 +1071,8 @@ local function onVehicleDestroyed(vid)
         refPlaneCache = {}
         lastHoveredBoxId = nil
         dragSequenceActive = false
-        lastDragPixelX = nil
-        lastDragPixelY = nil
+        lastMovePixelX, lastMovePixelY, lastMoveScreenId = nil, nil, nil
+        vehMat = nil
     end
     registeredVehicles[vid] = nil
     if not next(registeredVehicles) then
@@ -1176,7 +1131,7 @@ local function getLicensePlate(callbackId)
     end
 
     local plate = getLicensePlateLocal()
-    local packedData = lpack.encode(plate)
+    local packedData = escapeLuaString(lpack.encode(plate))
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
@@ -1305,7 +1260,7 @@ local function persistLoad(filename, scope, userId, identifier, callbackId)
     local data = persistLoadLocal(filename, scope, userId, identifier)
 
     -- Send to vehicle Lua via screenInput using lpack encoding
-    local packedData = lpack.encode(data)
+    local packedData = escapeLuaString(lpack.encode(data))
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistLoaded then
             screenInput.onPersistLoaded("]] .. callbackId .. [[", "]] .. packedData .. [[")
@@ -1331,7 +1286,7 @@ local function persistExists(filename, scope, userId, identifier, callbackId)
     end
 
     local exists = persistExistsLocal(filename, scope, userId, identifier)
-    local packedData = lpack.encode(exists)
+    local packedData = escapeLuaString(lpack.encode(exists))
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
@@ -1397,7 +1352,7 @@ local function persistListUsers(filename, identifier, callbackId)
     end
 
     local users = persistListUsersLocal(filename, identifier)
-    local packedData = lpack.encode(users)
+    local packedData = escapeLuaString(lpack.encode(users))
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
@@ -1577,8 +1532,8 @@ local function persistLoadMerged(filename, userId, identifier, callbackId)
 
     -- Send result back to vehicle via screenInput if callback requested
     if callbackId and vehicle then
-        local packedData = lpack.encode(result)
-        local packedSources = lpack.encode(sources)
+        local packedData = escapeLuaString(lpack.encode(result))
+        local packedSources = escapeLuaString(lpack.encode(sources))
         vehicle:queueLuaCommand([[
             if screenInput and screenInput.onPersistMerged then
                 screenInput.onPersistMerged("]] .. callbackId .. [[", "]] .. packedData .. [[", "]] .. packedSources ..
@@ -1609,7 +1564,7 @@ local function persistGetSource(filename, key, userId, identifier, callbackId)
     end
 
     local source = persistGetSourceLocal(filename, key, userId, identifier)
-    local packedData = lpack.encode(source)
+    local packedData = escapeLuaString(lpack.encode(source))
 
     vehicle:queueLuaCommand([[
         if screenInput and screenInput.onPersistCallback then
@@ -1749,9 +1704,9 @@ local function callVehicleLua(functionName, args)
         return
     end
 
-    local argsStr = lpack.encode(args)
+    local argsStr = escapeLuaString(lpack.encode(args))
     vehicle:queueLuaCommand(string.format('screenInput.onLuaCallback("%s", lpack.decode("%s"))', functionName,
-        argsStr:gsub('"', '\\"')))
+        argsStr))
 end
 
 M.callVehicleLua = callVehicleLua

@@ -113,7 +113,7 @@ class ScreenInputHandler {
    * @param {CoordinateEventData} eventData - Event data from BeamNG coordinate system
    */
   handleEvent(eventData: CoordinateEventData) {
-    const { type, x, y, screenId, button, deltaY, pixelX, pixelY } = eventData;
+    const { type, x, y, button, deltaY, pixelX, pixelY } = eventData;
 
     // Convert normalized coordinates to pixels if needed
     const clientX =
@@ -125,13 +125,9 @@ class ScreenInputHandler {
 
     switch (type) {
       case "click":
-        this.handleClick(element, clientX, clientY, button ?? 0);
-        break;
       case "mousedown":
-        this.handleMouseDown(element, clientX, clientY, button ?? 0);
-        break;
       case "mouseup":
-        this.handleMouseUp(element, clientX, clientY, button ?? 0);
+        this.dispatchMouseEvent(element, type, clientX, clientY, button ?? 0);
         break;
       case "mousemove":
         this.handleMouseMove(element, clientX, clientY);
@@ -148,45 +144,17 @@ class ScreenInputHandler {
     }
   }
 
-  handleClick(element: Element | null, x: number, y: number, button: number) {
-    if (!element) return;
-
-    const event = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      button: button,
-      view: window,
-    });
-
-    element.dispatchEvent(event);
-  }
-
-  handleMouseDown(
+  // Shared dispatcher for click/mousedown/mouseup
+  dispatchMouseEvent(
     element: Element | null,
+    type: string,
     x: number,
     y: number,
     button: number,
   ) {
     if (!element) return;
 
-    const event = new MouseEvent("mousedown", {
-      bubbles: true,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      button: button,
-      view: window,
-    });
-
-    element.dispatchEvent(event);
-  }
-
-  handleMouseUp(element: Element | null, x: number, y: number, button: number) {
-    if (!element) return;
-
-    const event = new MouseEvent("mouseup", {
+    const event = new MouseEvent(type, {
       bubbles: true,
       cancelable: true,
       clientX: x,
@@ -204,18 +172,21 @@ class ScreenInputHandler {
     if (element !== this.lastHoverElement) {
       const newChain = element ? this.getDownstreamChain(element) : [];
       const oldChain = this.hoveredElements;
+      // Sets make the chain diff O(n) instead of O(n^2) includes() scans
+      const newChainSet = new Set(newChain);
+      const oldChainSet = new Set(oldChain);
 
       // Remove .hovered from elements no longer in the chain
       if (this.enableHover) {
         for (const el of oldChain) {
-          if (!newChain.includes(el)) {
+          if (!newChainSet.has(el)) {
             el.classList.remove("hovered");
           }
         }
       }
 
       // Dispatch leave event to previous direct element only
-      if (this.lastHoverElement && !newChain.includes(this.lastHoverElement)) {
+      if (this.lastHoverElement && !newChainSet.has(this.lastHoverElement)) {
         const leaveEvent = new MouseEvent("mouseleave", {
           bubbles: false,
           cancelable: true,
@@ -229,14 +200,14 @@ class ScreenInputHandler {
       // Add .hovered to new elements in the chain
       if (this.enableHover) {
         for (const el of newChain) {
-          if (!oldChain.includes(el)) {
+          if (!oldChainSet.has(el)) {
             el.classList.add("hovered");
           }
         }
       }
 
       // Dispatch enter event to new direct element only
-      if (element && !oldChain.includes(element)) {
+      if (element && !oldChainSet.has(element)) {
         const enterEvent = new MouseEvent("mouseenter", {
           bubbles: false,
           cancelable: true,
@@ -251,7 +222,7 @@ class ScreenInputHandler {
       this.hoveredElements = newChain;
     }
 
-    // Throttle mousemove events to 30fps to reduce overhead
+    // Throttle raw mousemove
     const now = Date.now();
     if (element && now - this.lastMouseMoveTime >= this.mouseMoveThrottle) {
       this.lastMouseMoveTime = now;
@@ -359,6 +330,57 @@ class ScreenInputHandler {
 
 // Global handler instance
 let handler: ScreenInputHandler | null = null;
+
+// LUA BRIDGE HELPERS
+function luaBridgeAvailable(): boolean {
+  return (
+    typeof beamng !== "undefined" && typeof beamng.sendEngineLua === "function"
+  );
+}
+
+/**
+ * Escape a string for embedding inside a Lua string literal.
+ * Without this, JSON payloads containing quotes or backslashes
+ * (such as {"msg": "it's \"fine\""}) break the generated Lua command.
+ */
+function escapeLuaArg(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+// Monotonic counter guarantees unique callback ids
+let _cbSeq = 0;
+
+/**
+ * Register a one-shot window callback for async Lua -> JS responses.
+ * Cleans itself up after firing, or after 30s with fallback args if Lua never responds.
+ *
+ * @param prefix - Callback id prefix (for log readability)
+ * @param onResult - Receives the Lua response args
+ * @param timeoutArgs - Arguments passed to onResult if the callback times out
+ * @returns The generated callback id to embed in the Lua command
+ */
+function registerCefCallback(
+  prefix: string,
+  onResult: (...args: any[]) => void,
+  timeoutArgs: any[] = [null],
+): string {
+  const callbackId = prefix + Date.now() + "_" + ++_cbSeq;
+
+  (window as any)[callbackId] = function (...args: any[]) {
+    delete (window as any)[callbackId];
+    onResult(...args);
+  };
+
+  setTimeout(() => {
+    if ((window as any)[callbackId]) {
+      delete (window as any)[callbackId];
+      console.warn(`Callback ${callbackId} timed out after 30s`);
+      onResult(...timeoutArgs);
+    }
+  }, 30000);
+
+  return callbackId;
+}
 
 /**
  * Initialize the screen input handler.
@@ -535,15 +557,12 @@ window.screenInput = {
    * end
    */
   callLua: function (functionName, args) {
-    if (
-      typeof beamng === "undefined" ||
-      typeof beamng.sendEngineLua !== "function"
-    ) {
+    if (!luaBridgeAvailable()) {
       console.warn("beamng.sendEngineLua not available");
       return;
     }
 
-    const argsJson = JSON.stringify(args || {});
+    const argsJson = escapeLuaArg(JSON.stringify(args || {}));
     beamng.sendEngineLua(
       `screenService.callVehicleLua("${functionName}", jsonDecode('${argsJson}'))`,
     );
@@ -644,15 +663,12 @@ function persistSave(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
 
-  const jsonStr = JSON.stringify(data);
+  const jsonStr = escapeLuaArg(JSON.stringify(data));
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
@@ -679,10 +695,7 @@ function persistLoad(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     if (callback) callback(null);
     return;
@@ -691,26 +704,9 @@ function persistLoad(
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-  const callbackId =
-    "_persistLoadCallback_" +
-    Date.now() +
-    "_" +
-    Math.random().toString(36).substr(2, 9);
-
-  // Create temporary callback with 30s timeout
-  (window as any)[callbackId] = function (data: any) {
-    delete (window as any)[callbackId];
+  const callbackId = registerCefCallback("_persistLoadCallback_", (data) => {
     if (callback) callback(data);
-  };
-
-  // Cleanup after 30 seconds if callback never fires
-  setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
-      console.warn(`Callback ${callbackId} timed out after 30s`);
-      if (callback) callback(null);
-    }
-  }, 30000);
+  });
 
   beamng.sendEngineLua(
     `screenService.persistLoad("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
@@ -733,10 +729,7 @@ function persistExists(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     if (callback) callback(false);
     return;
@@ -745,25 +738,13 @@ function persistExists(
   const safeScope = scope || "global";
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-  const callbackId =
-    "_persistExistsCallback_" +
-    Date.now() +
-    "_" +
-    Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (exists: boolean | string) {
-    delete (window as any)[callbackId];
-    if (callback) callback(exists === true || exists === "true");
-  };
-
-  // Cleanup after 30 seconds if callback never fires
-  setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
-      console.warn(`Callback ${callbackId} timed out after 30s`);
-      if (callback) callback(false);
-    }
-  }, 30000);
+  const callbackId = registerCefCallback(
+    "_persistExistsCallback_",
+    (exists) => {
+      if (callback) callback(exists === true || exists === "true");
+    },
+    [false],
+  );
 
   beamng.sendEngineLua(
     `screenService.persistExists("${filename}", "${safeScope}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
@@ -784,10 +765,7 @@ function persistDelete(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
@@ -807,34 +785,15 @@ function persistDelete(
  * @param {function} callback - Function to call with license plate string (or null)
  */
 function getLicensePlate(callback: (plate: string | null) => void) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     if (callback) callback(null);
     return;
   }
 
-  const callbackId =
-    "_cefPlateCallback_" +
-    Date.now() +
-    "_" +
-    Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (plate: string | null) {
-    delete (window as any)[callbackId];
+  const callbackId = registerCefCallback("_cefPlateCallback_", (plate) => {
     if (callback) callback(plate);
-  };
-
-  // Cleanup after 30 seconds if callback never fires
-  setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
-      console.warn(`Callback ${callbackId} timed out after 30s`);
-      if (callback) callback(null);
-    }
-  }, 30000);
+  });
 
   beamng.sendEngineLua(`screenService.getLicensePlate("${callbackId}");`);
 }
@@ -851,35 +810,16 @@ function persistListUsers(
   callback: (users: string[]) => void,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     if (callback) callback([]);
     return;
   }
 
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-  const callbackId =
-    "_persistUsersCallback_" +
-    Date.now() +
-    "_" +
-    Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (users: string[]) {
-    delete (window as any)[callbackId];
+  const callbackId = registerCefCallback("_persistUsersCallback_", (users) => {
     if (callback) callback(users || []);
-  };
-
-  // Cleanup after 30 seconds if callback never fires
-  setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
-      console.warn(`Callback ${callbackId} timed out after 30s`);
-      if (callback) callback([]);
-    }
-  }, 30000);
+  });
 
   beamng.sendEngineLua(
     `screenService.persistListUsers("${filename}", ${safeIdentifier}, "${callbackId}")`,
@@ -894,15 +834,12 @@ function persistListUsers(
  * @param {object} defaults - Default values object
  */
 function persistRegisterDefaults(filename: string, defaults: any) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
 
-  const jsonStr = JSON.stringify(defaults);
+  const jsonStr = escapeLuaArg(JSON.stringify(defaults));
   beamng.sendEngineLua(
     `screenService.persistRegisterDefaults("${filename}", jsonDecode('${jsonStr}'))`,
   );
@@ -916,16 +853,13 @@ function persistRegisterDefaults(filename: string, defaults: any) {
  * @param {object} [defaults] - Optional defaults to use (overrides registered defaults)
  */
 function persistInitDefaults(filename: string, defaults?: any) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
 
   if (defaults) {
-    const jsonStr = JSON.stringify(defaults);
+    const jsonStr = escapeLuaArg(JSON.stringify(defaults));
     beamng.sendEngineLua(
       `screenService.persistInitDefaults("${filename}", jsonDecode('${jsonStr}'))`,
     );
@@ -949,10 +883,7 @@ function persistResetToFactory(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     return;
   }
@@ -987,10 +918,7 @@ function persistLoadMerged(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     if (callback) callback(null, null);
     return;
@@ -998,25 +926,13 @@ function persistLoadMerged(
 
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-  const callbackId =
-    "_persistMergedCallback_" +
-    Date.now() +
-    "_" +
-    Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (data: any, sources: any) {
-    delete (window as any)[callbackId];
-    if (callback) callback(data, sources);
-  };
-
-  // Cleanup after 30 seconds if callback never fires
-  setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
-      console.warn(`Callback ${callbackId} timed out after 30s`);
-      if (callback) callback(null, null);
-    }
-  }, 30000);
+  const callbackId = registerCefCallback(
+    "_persistMergedCallback_",
+    (data, sources) => {
+      if (callback) callback(data, sources);
+    },
+    [null, null],
+  );
 
   beamng.sendEngineLua(
     `screenService.persistLoadMerged("${filename}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
@@ -1039,10 +955,7 @@ function persistGetSource(
   userId?: string,
   identifier?: string,
 ) {
-  if (
-    typeof beamng === "undefined" ||
-    typeof beamng.sendEngineLua !== "function"
-  ) {
+  if (!luaBridgeAvailable()) {
     console.warn("beamng.sendEngineLua not available");
     if (callback) callback(null);
     return;
@@ -1050,25 +963,12 @@ function persistGetSource(
 
   const safeUserId = userId ? `"${userId}"` : "nil";
   const safeIdentifier = identifier ? `"${identifier}"` : "nil";
-  const callbackId =
-    "_persistSourceCallback_" +
-    Date.now() +
-    "_" +
-    Math.random().toString(36).substr(2, 9);
-
-  (window as any)[callbackId] = function (source: string | null) {
-    delete (window as any)[callbackId];
-    if (callback) callback(source);
-  };
-
-  // Cleanup after 30 seconds if callback never fires
-  setTimeout(() => {
-    if ((window as any)[callbackId]) {
-      delete (window as any)[callbackId];
-      console.warn(`Callback ${callbackId} timed out after 30s`);
-      if (callback) callback(null);
-    }
-  }, 30000);
+  const callbackId = registerCefCallback(
+    "_persistSourceCallback_",
+    (source) => {
+      if (callback) callback(source);
+    },
+  );
 
   beamng.sendEngineLua(
     `screenService.persistGetSource("${filename}", "${key}", ${safeUserId}, ${safeIdentifier}, "${callbackId}")`,
@@ -1079,19 +979,13 @@ function persistGetSource(
 (window as any).persistCallback = function (callbackData: PersistCallbackData) {
   const { type, callbackId, data, sources } = callbackData;
 
-  if ((window as any)[callbackId]) {
-    if (type === "loaded") {
-      (window as any)[callbackId](data);
-    } else if (type === "merged") {
-      (window as any)[callbackId](data, sources);
-    } else if (type === "exists") {
-      (window as any)[callbackId](data);
-    } else if (type === "plate") {
-      (window as any)[callbackId](data);
-    } else if (type === "users") {
-      (window as any)[callbackId](data);
-    } else if (type === "source") {
-      (window as any)[callbackId](data);
+  const fn = (window as any)[callbackId];
+  if (typeof fn === "function") {
+    // Only "merged" carries a second argument. Everything else just forwards data
+    if (type === "merged") {
+      fn(data, sources);
+    } else {
+      fn(data);
     }
   }
 };
@@ -1159,7 +1053,7 @@ function defineScreenData<T extends ScreenDataSchema>(
       sub.customModules = rows;
     }
 
-    const json = JSON.stringify(sub);
+    const json = escapeLuaArg(JSON.stringify(sub));
     beamng.sendEngineLua(
       `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
     );

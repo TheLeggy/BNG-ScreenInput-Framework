@@ -23,7 +23,6 @@ local screenName = nil
 local htmlPath = nil
 local htmlTextureInstance = nil
 
-local updateTimer = 0
 local updateFPS = 90
 local dataUpdateInterval = 1 / 24
 local dataTimer = 0
@@ -47,8 +46,11 @@ local customModuleUpdate = nop
 
 -- Update electrics data
 local function updateElectricsData(dt)
-    for _, v in ipairs(electricsConfig) do
-        screenData.electrics[v] = electrics.values[v] or 0
+    local values = electrics.values
+    local data = screenData.electrics
+    for i = 1, #electricsConfig do
+        local name = electricsConfig[i]
+        data[name] = values[name] or 0
     end
 end
 
@@ -68,7 +70,6 @@ end
 
 -- Main update loop
 local function updateGFX(dt)
-    updateTimer = updateTimer + dt
     dataTimer = dataTimer + dt
     if htmlTextureInstance and playerInfo.anyPlayerSeated and dataTimer >= dataUpdateInterval then
         if modePendingFlush then

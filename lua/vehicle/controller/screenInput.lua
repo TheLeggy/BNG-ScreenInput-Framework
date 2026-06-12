@@ -15,23 +15,12 @@ local triggerConfigPath = ""
 local drawBoxes = false
 
 local playerSeated = false
-local driverNodeCid = 0
-local isInside = false
 
 -- Send JS calls to all registered HTML screens
 local function callJS(...)
-    for _, v in ipairs(gaugeHTMLTextures) do
-        v:callJS(...)
+    for i = 1, #gaugeHTMLTextures do
+        gaugeHTMLTextures[i]:callJS(...)
     end
-end
-
--- Camera positioning detection 
-local function updateCameraState()
-    local camPos = obj:getCameraPosition()
-    local driverPos = obj:getPosition() + obj:getNodePosition(driverNodeCid)
-
-    -- Check if camera is within 0.6m of driver position (interior view)
-    isInside = driverPos and (camPos:distance(driverPos) <= 0.6) or false
 end
 
 local function onPlayersChanged(active)
@@ -50,8 +39,6 @@ local function updateGFX(dt)
         onPlayersChanged(playerInfo.anyPlayerSeated)
         playerSeated = playerInfo.anyPlayerSeated
     end
-
-    updateCameraState()
 end
 
 local function addScreen(htmlTexture)
@@ -111,8 +98,6 @@ local function init(jbeamData)
 
     -- Reload the screenService extension
     obj:queueGameEngineLua("extensions.reload('screenService')")
-
-    driverNodeCid = beamstate.nodeNameMap["driver"] or 0
 end
 
 M.reset = reset
