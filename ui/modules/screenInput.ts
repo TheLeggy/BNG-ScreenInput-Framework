@@ -991,8 +991,6 @@ function persistGetSource(
 };
 
 /**
- * @tsExclusive **[ This feature is only available on the TypeScript version of ScreenInput! ]**
- *
  * Declare which vehicle data your screen needs.
  * Subscribes to electrics, powertrain devices, and custom modules
  * Returns a typed object kept up to date automatically on each updateData() call

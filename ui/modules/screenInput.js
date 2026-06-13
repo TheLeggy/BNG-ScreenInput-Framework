@@ -772,6 +772,112 @@ window.persistCallback = function (callbackData) {
     }
   }
 };
+/**
+ * Declare which vehicle data your screen needs.
+ * Subscribes to electrics, powertrain devices, and custom modules
+ * Returns a typed object kept up to date automatically on each updateData() call
+ *
+ * @param {ScreenDataSchema} schema - Data your screen uses (include default values!)
+ *
+ * @example
+ * const data = defineScreenData({
+ *   electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
+ *   powertrain: {
+ *     mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
+ *     gearbox: { gearIndex: 0 }
+ *   },
+ *   customModules: {
+ *     combustionEngineData: { currentPower: 0, currentTorque: 0 }
+ *   }
+ * });
+ *
+ * window.updateData = () => {
+ *   document.getElementById("rpm").textContent = data.electrics.rpm;
+ *   document.getElementById("torque").textContent = data.powertrain.mainEngine.outputTorque1;
+ *   document.getElementById("power").textContent = data.customModules.combustionEngineData.currentPower;
+ * };
+ */
+function defineScreenData(schema) {
+  const instance = JSON.parse(JSON.stringify(schema));
+  if (
+    typeof beamng !== "undefined" &&
+    typeof beamng.sendEngineLua === "function"
+  ) {
+    const sub = {};
+    if (schema.electrics) {
+      sub.electrics = Object.keys(schema.electrics);
+    }
+    // build header-table format [["deviceName","property"], ["engine","rpm"], ...]
+    if (schema.powertrain) {
+      const rows = [["deviceName", "property"]];
+      for (const deviceName of Object.keys(schema.powertrain)) {
+        for (const property of Object.keys(schema.powertrain[deviceName])) {
+          rows.push([deviceName, property]);
+        }
+      }
+      sub.powertrain = rows;
+    }
+    if (schema.customModules) {
+      const rows = [["moduleName", "property"]];
+      for (const moduleName of Object.keys(schema.customModules)) {
+        for (const property of Object.keys(schema.customModules[moduleName])) {
+          rows.push([moduleName, property]);
+        }
+      }
+      sub.customModules = rows;
+    }
+    const json = escapeLuaArg(JSON.stringify(sub));
+    beamng.sendEngineLua(
+      `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
+    );
+  }
+  // Intercept window.updateData assignments so the merge wrapper is installed
+  // regardless of when the user assigns their function
+  const _merge = (incoming) => {
+    if (incoming.electrics)
+      Object.assign(instance.electrics, incoming.electrics);
+    if (incoming.powertrain) {
+      for (const device of Object.keys(incoming.powertrain)) {
+        if (instance.powertrain && instance.powertrain[device]) {
+          Object.assign(
+            instance.powertrain[device],
+            incoming.powertrain[device],
+          );
+        }
+      }
+    }
+    if (incoming.customModules) {
+      for (const mod of Object.keys(incoming.customModules)) {
+        if (instance.customModules && instance.customModules[mod]) {
+          Object.assign(
+            instance.customModules[mod],
+            incoming.customModules[mod],
+          );
+        }
+      }
+    }
+  };
+  // Install merge wrapper; persistent getter keeps window.updateData defined during load
+  const _prevFn = window.updateData; // current no-op or prior wrapper
+  window.updateData = function (incoming) {
+    _merge(incoming);
+    _prevFn(incoming);
+  };
+  // Re-intercept future assignments so the merge wrapper stays in place
+  const _desc = Object.getOwnPropertyDescriptor(window, "updateData");
+  const _baseSetter = _desc.set;
+  Object.defineProperty(window, "updateData", {
+    ..._desc,
+    set(userFn) {
+      _baseSetter(function (incoming) {
+        _merge(incoming);
+        userFn(incoming);
+      });
+    },
+  });
+  return instance;
+}
+window.defineScreenData = defineScreenData;
 // Export for global use
 window.persistSave = persistSave;
 window.persistLoad = persistLoad;

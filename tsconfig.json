@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ES2016",
-    "lib": ["ES2016", "DOM"],
-    "module": "CommonJS",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "strict": false,
     "noEmit": true,
     "skipLibCheck": true
   },
   "include": ["ui/**/*.ts"],
-  "exclude": ["node_modules",],
+  "exclude": ["node_modules"]
 }
