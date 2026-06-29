@@ -21,17 +21,24 @@ class ScreenInputHandler {
     this.enableHover = false;
     this.lastHoverElement = null;
     this.hoveredElements = [];
+    this.hoverScratchElements = [];
     this.lastMouseMoveTime = 0;
     this.mouseMoveThrottle = 1; // was 11ms. throttled way less cause it seems to make no difference anyway?
   }
-  getDownstreamChain(element) {
-    const chain = [];
+  getDownstreamChain(element, chain) {
+    chain.length = 0;
     let current = element;
     while (current && current !== document.body) {
       chain.push(current);
       current = current.parentElement;
     }
     return chain;
+  }
+  containsElement(elements, target) {
+    for (let i = 0; i < elements.length; i++) {
+      if (elements[i] === target) return true;
+    }
+    return false;
   }
   /**
    * Main event handler called from Lua
@@ -82,21 +89,24 @@ class ScreenInputHandler {
     // Manual hover tracking needed because CSS :hover doesn't activate
     // when we synthesize events from coordinate data
     if (element !== this.lastHoverElement) {
-      const newChain = element ? this.getDownstreamChain(element) : [];
+      const newChain = this.getDownstreamChain(
+        element,
+        this.hoverScratchElements,
+      );
       const oldChain = this.hoveredElements;
-      // Sets make the chain diff O(n) instead of O(n^2) includes() scans
-      const newChainSet = new Set(newChain);
-      const oldChainSet = new Set(oldChain);
       // Remove .hovered from elements no longer in the chain
       if (this.enableHover) {
         for (const el of oldChain) {
-          if (!newChainSet.has(el)) {
+          if (!this.containsElement(newChain, el)) {
             el.classList.remove("hovered");
           }
         }
       }
       // Dispatch leave event to previous direct element only
-      if (this.lastHoverElement && !newChainSet.has(this.lastHoverElement)) {
+      if (
+        this.lastHoverElement &&
+        !this.containsElement(newChain, this.lastHoverElement)
+      ) {
         const leaveEvent = new MouseEvent("mouseleave", {
           bubbles: false,
           cancelable: true,
@@ -109,13 +119,13 @@ class ScreenInputHandler {
       // Add .hovered to new elements in the chain
       if (this.enableHover) {
         for (const el of newChain) {
-          if (!oldChainSet.has(el)) {
+          if (!this.containsElement(oldChain, el)) {
             el.classList.add("hovered");
           }
         }
       }
       // Dispatch enter event to new direct element only
-      if (element && !oldChainSet.has(element)) {
+      if (element && !this.containsElement(oldChain, element)) {
         const enterEvent = new MouseEvent("mouseenter", {
           bubbles: false,
           cancelable: true,
@@ -127,6 +137,7 @@ class ScreenInputHandler {
       }
       this.lastHoverElement = element;
       this.hoveredElements = newChain;
+      this.hoverScratchElements = oldChain;
     }
     // Throttle raw mousemove
     const now = Date.now();
@@ -144,7 +155,11 @@ class ScreenInputHandler {
   }
   handleMouseEnter(element, x, y) {
     if (!element) return;
-    const newChain = this.getDownstreamChain(element);
+    const newChain = this.getDownstreamChain(
+      element,
+      this.hoverScratchElements,
+    );
+    const oldChain = this.hoveredElements;
     // Add .hovered to element and all downstream elements
     if (this.enableHover) {
       for (const el of newChain) {
@@ -161,24 +176,28 @@ class ScreenInputHandler {
     element.dispatchEvent(event);
     this.lastHoverElement = element;
     this.hoveredElements = newChain;
+    this.hoverScratchElements = oldChain;
   }
   handleMouseLeave(element, x, y) {
-    if (!element) return;
+    const leaveElement = element ?? this.lastHoverElement;
+    if (!leaveElement && this.hoveredElements.length === 0) return;
     if (this.enableHover) {
       for (const el of this.hoveredElements) {
         el.classList.remove("hovered");
       }
     }
-    const event = new MouseEvent("mouseleave", {
-      bubbles: false,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      view: window,
-    });
-    element.dispatchEvent(event);
+    if (leaveElement) {
+      const event = new MouseEvent("mouseleave", {
+        bubbles: false,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        view: window,
+      });
+      leaveElement.dispatchEvent(event);
+    }
     this.lastHoverElement = null;
-    this.hoveredElements = [];
+    this.hoveredElements.length = 0;
   }
   handleWheel(element, x, y, deltaY) {
     if (!element) return;
@@ -434,7 +453,12 @@ window.screenInput = {
    * Called when cursor enters/leaves the screen trigger box
    * Rarely needed. Coordinate events handle most use cases
    */
-  onHover: function (data) {},
+  onHover: function (data) {
+    const boxId = typeof data === "string" ? data : data?.boxId;
+    if (!boxId) {
+      handler?.handleMouseLeave(null, 0, 0);
+    }
+  },
   /**
    * Trigger event handler called from Lua
    * Dispatches custom events for physical triggers

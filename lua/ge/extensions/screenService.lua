@@ -123,7 +123,7 @@ local function detectMouseEvent()
     end
 
     if im.IsMouseClicked(0) then
-        return "click", 0
+        return "mousedown", 0
     end
     if im.IsMouseReleased(0) then
         return "mouseup", 0
@@ -154,6 +154,8 @@ local lastMovePixelX = nil
 local lastMovePixelY = nil
 local lastMoveScreenId = nil
 local dragSequenceActive = false
+local clickSuppressedByDrag = false
+local coordinateEventData = {}
 local function sendCoordinateEvent(eventData)
     if not vehicle then
         return
@@ -168,6 +170,18 @@ local function sendCoordinateEvent(eventData)
             screenInput.inputCoordinate(eventData)
         end
     ]])
+end
+
+local function sendScreenCoordinateEvent(eventType, screenId, x, y, button, pixelX, pixelY, deltaY)
+    coordinateEventData.type = eventType
+    coordinateEventData.x = x
+    coordinateEventData.y = y
+    coordinateEventData.screenId = screenId
+    coordinateEventData.button = button
+    coordinateEventData.pixelX = pixelX
+    coordinateEventData.pixelY = pixelY
+    coordinateEventData.deltaY = deltaY
+    sendCoordinateEvent(coordinateEventData)
 end
 
 local function sendHover(boxId)
@@ -693,8 +707,9 @@ local function onUpdate(dt)
     if not vehicle or not vehicle.getPosition or not boxes[1] then
         return
     end
-    if dragSequenceActive and not ui_imgui.IsMouseDown(0) then
+    if dragSequenceActive and not ui_imgui.IsMouseDown(0) and not ui_imgui.IsMouseReleased(0) then
         dragSequenceActive = false
+        clickSuppressedByDrag = false
     end
     local ray = getCameraMouseRay()
 
@@ -757,22 +772,22 @@ local function onUpdate(dt)
                 local pixelX, pixelY = normalizedToPixel(cx, cy, screenConfig.width, screenConfig.height)
 
                 local sendType = eventType
-                if eventType == "drag" then
+                local sendClickAfterMouseup = false
+                if eventType == "mousedown" then
+                    dragSequenceActive = true
+                    clickSuppressedByDrag = false
+                elseif eventType == "drag" then
                     if not dragSequenceActive then
-                        sendCoordinateEvent({
-                            type = "mousedown",
-                            x = cx,
-                            y = cy,
-                            screenId = v.screenId,
-                            button = button or 0,
-                            pixelX = pixelX,
-                            pixelY = pixelY
-                        })
+                        sendScreenCoordinateEvent("mousedown", v.screenId, cx, cy, button or 0, pixelX, pixelY)
                         dragSequenceActive = true
+                        clickSuppressedByDrag = false
                     end
+                    clickSuppressedByDrag = true
                     sendType = "mousemove"
                 elseif eventType == "mouseup" then
+                    sendClickAfterMouseup = dragSequenceActive and not clickSuppressedByDrag
                     dragSequenceActive = false
+                    clickSuppressedByDrag = false
                 end
 
                 -- Skip resending mousemove while the cursor sits still
@@ -780,23 +795,20 @@ local function onUpdate(dt)
                                             pixelY == lastMovePixelY and v.screenId == lastMoveScreenId
 
                 if not isDuplicateMove then
-                    local eventData = {
-                        type = sendType,
-                        x = cx,
-                        y = cy,
-                        screenId = v.screenId,
-                        pixelX = pixelX,
-                        pixelY = pixelY
-                    }
+                    sendScreenCoordinateEvent(
+                        sendType,
+                        v.screenId,
+                        cx,
+                        cy,
+                        button,
+                        pixelX,
+                        pixelY,
+                        eventType == "wheel" and mouseWheel and mouseWheel * -100 or nil
+                    )
 
-                    if button then
-                        eventData.button = button
+                    if sendClickAfterMouseup then
+                        sendScreenCoordinateEvent("click", v.screenId, cx, cy, button or 0, pixelX, pixelY)
                     end
-                    if eventType == "wheel" and mouseWheel then
-                        eventData.deltaY = mouseWheel * -100
-                    end
-
-                    sendCoordinateEvent(eventData)
 
                     if sendType == "mousemove" then
                         lastMovePixelX, lastMovePixelY, lastMoveScreenId = pixelX, pixelY, v.screenId
@@ -834,6 +846,12 @@ local function onUpdate(dt)
     -- Handle hover state changes
     if currentHoveredBoxId ~= lastHoveredBoxId then
         if lastHoveredBoxId then
+            -- if mouse left the screen while a drag/press was active, release it
+            if dragSequenceActive and lastMovePixelX then
+                sendScreenCoordinateEvent("mouseup", lastMoveScreenId, nil, nil, 0, lastMovePixelX, lastMovePixelY)
+                dragSequenceActive = false
+                clickSuppressedByDrag = false
+            end
             sendHover(nil)
         end
         if currentHoveredBoxId then
@@ -1071,6 +1089,7 @@ local function onVehicleDestroyed(vid)
         refPlaneCache = {}
         lastHoveredBoxId = nil
         dragSequenceActive = false
+        clickSuppressedByDrag = false
         lastMovePixelX, lastMovePixelY, lastMoveScreenId = nil, nil, nil
         vehMat = nil
     end

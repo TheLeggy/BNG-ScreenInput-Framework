@@ -51,6 +51,7 @@ Add the controllers to your vehicle's jbeam file:
 
 - `triggerConfigPath` - Path to configuration files (defaults to `vehicles/{model}/interactive_screen/`)
 - `drawBoxes` - Enable visualization by adding `{"drawBoxes": true}` to the `screenInput` entry (defaults to `false`)
+- `name` - Unique controller name for this screen (defaults to `"newScreen"` and is **required** when using multiple `newScreen` controllers, see [Multiple Screens](#multiple-screens))
 - `screenId` - Material name to render the HTML on
 - `htmlPath` - Path to HTML display (without `local://local/` prefix)
 - `displayWidth` / `displayHeight` - Screen resolution in pixels
@@ -938,9 +939,11 @@ This visualization is invaluable when positioning triggers. You can see exactly 
 
 You can have multiple interactive screens in the same vehicle. Each screen needs:
 
-1. Its own `newScreen` controller with unique name and material
-2. Trigger boxes with matching `screenId` properties (use controller name)
+1. Its own `newScreen` controller with a unique `name` field and unique `screenId`
+2. Trigger boxes with matching `screenId` properties
 3. HTML displays that call `initScreenInput()` with matching screen IDs
+
+**The `name` field is required when you have more than one `newScreen` controller.** Without it, both controllers default to the name `"newScreen"` and BeamNG lets last to load win.
 
 **Example:**
 
@@ -949,12 +952,14 @@ You can have multiple interactive screens in the same vehicle. Each screen needs
   ["fileName"],
   ["screenInput"],
   ["newScreen", {
+    "name": "infotainmentScreen",
     "screenId": "main_screen",
     "htmlPath": "vehicles/yourcar/displays/infotainment/index.html",
     "displayWidth": 1920,
     "displayHeight": 1080
   }],
   ["newScreen", {
+    "name": "gaugeScreen",
     "screenId": "gauge_cluster",
     "htmlPath": "vehicles/yourcar/displays/cluster/index.html",
     "displayWidth": 1280,

@@ -1,5 +1,12 @@
 export interface CoordinateEventData {
-  type: "click" | "mousedown" | "mouseup" | "mousemove" | "mouseenter" | "mouseleave" | "wheel";
+  type:
+    | "click"
+    | "mousedown"
+    | "mouseup"
+    | "mousemove"
+    | "mouseenter"
+    | "mouseleave"
+    | "wheel";
   x: number;
   y: number;
   screenId?: string;
@@ -43,20 +50,70 @@ type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
 type ScreenDataInstance<T extends ScreenDataSchema> = DeepWriteable<T>;
 
 declare global {
-  function initScreenInput(width?: number | SifConfig, height?: number, screenId?: string | null, options?: SifOptions): void;
-  function defineScreenData<T extends ScreenDataSchema>(schema: T): ScreenDataInstance<T>;
+  function initScreenInput(
+    width?: number | SifConfig,
+    height?: number,
+    screenId?: string | null,
+    options?: SifOptions,
+  ): void;
+  function defineScreenData<T extends ScreenDataSchema>(
+    schema: T,
+  ): ScreenDataInstance<T>;
   function loadTS(url: string): Promise<void>;
   function callVehicleLua(functionName: string, args?: unknown): void;
-  function persistSave(filename: string, data: object, scope?: string, userId?: string, identifier?: string): void;
-  function persistLoad(filename: string, callback: (data: any) => void, scope?: string, userId?: string, identifier?: string): void;
-  function persistExists(filename: string, callback: (exists: boolean) => void, scope?: string, userId?: string, identifier?: string): void;
-  function persistDelete(filename: string, scope?: string, userId?: string, identifier?: string): void;
-  function persistLoadMerged(filename: string, callback: (data: any, sources: Record<string, string>) => void, userId?: string, identifier?: string): void;
+  function persistSave(
+    filename: string,
+    data: object,
+    scope?: string,
+    userId?: string,
+    identifier?: string,
+  ): void;
+  function persistLoad(
+    filename: string,
+    callback: (data: any) => void,
+    scope?: string,
+    userId?: string,
+    identifier?: string,
+  ): void;
+  function persistExists(
+    filename: string,
+    callback: (exists: boolean) => void,
+    scope?: string,
+    userId?: string,
+    identifier?: string,
+  ): void;
+  function persistDelete(
+    filename: string,
+    scope?: string,
+    userId?: string,
+    identifier?: string,
+  ): void;
+  function persistLoadMerged(
+    filename: string,
+    callback: (data: any, sources: Record<string, string>) => void,
+    userId?: string,
+    identifier?: string,
+  ): void;
   function persistRegisterDefaults(filename: string, defaults: object): void;
   function persistInitDefaults(filename: string): void;
-  function persistResetToFactory(filename: string, scope?: string, userId?: string, identifier?: string): void;
-  function persistGetSource(filename: string, key: string, callback: (source: string) => void, userId?: string, identifier?: string): void;
-  function persistListUsers(filename: string, callback: (users: string[]) => void, identifier?: string): void;
+  function persistResetToFactory(
+    filename: string,
+    scope?: string,
+    userId?: string,
+    identifier?: string,
+  ): void;
+  function persistGetSource(
+    filename: string,
+    key: string,
+    callback: (source: string) => void,
+    userId?: string,
+    identifier?: string,
+  ): void;
+  function persistListUsers(
+    filename: string,
+    callback: (users: string[]) => void,
+    identifier?: string,
+  ): void;
   function getLicensePlate(callback: (plate: string) => void): void;
 
   interface Window {
@@ -67,7 +124,7 @@ declare global {
     screenInput: {
       onInput: (eventData: CoordinateEventData) => void;
       callLua: (functionName: string, args: unknown) => void;
-      onHover: (data: { boxId?: string | null }) => void;
+      onHover: (data: { boxId?: string | null } | string | null) => void;
       onTrigger?: (eventData: TriggerEventData) => void;
     };
     setup: (config: SifConfig) => void;
@@ -91,7 +148,10 @@ declare global {
     bridge: {
       api: {
         engineLua: (cmd: string, callback?: (result: any) => void) => void;
-        activeObjectLua: (cmd: string, callback?: (result: any) => void) => void;
+        activeObjectLua: (
+          cmd: string,
+          callback?: (result: any) => void,
+        ) => void;
         queueAllObjectLua: (cmd: string) => void;
         engineScript: (cmd: string, callback?: (result: any) => void) => void;
         subscribeToEvents: (data: string) => void;

@@ -115,9 +115,7 @@ M.inputCoordinate = inputCoordinate
 
 -- Hover state changes (mouse enter/leave trigger boxes)
 local function onHover(boxId)
-    callJS("screenInput.onHover", {
-        boxId = boxId
-    })
+    callJS("screenInput.onHover", boxId)
 end
 
 M.onHover = onHover
@@ -179,12 +177,18 @@ M.playTestSound = playTestSound
 local luaCallbackHandlers = {}
 
 local function registerLuaCallback(functionName, handler)
-    luaCallbackHandlers[functionName] = handler
+    if not luaCallbackHandlers[functionName] then
+        luaCallbackHandlers[functionName] = {}
+    end
+    table.insert(luaCallbackHandlers[functionName], handler)
 end
 
 local function onLuaCallback(functionName, args)
-    if luaCallbackHandlers[functionName] then
-        luaCallbackHandlers[functionName](args)
+    local handlers = luaCallbackHandlers[functionName]
+    if handlers then
+        for _, h in ipairs(handlers) do
+            h(args)
+        end
     else
         log("W", "screenInput.onLuaCallback", "No handler registered for: " .. tostring(functionName))
     end
