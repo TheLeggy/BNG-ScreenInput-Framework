@@ -83,6 +83,8 @@ class ScreenInputHandler {
   hoverScratchElements: Element[];
   lastMouseMoveTime: number;
   mouseMoveThrottle: number;
+  lastMoveX: number | null;
+  lastMoveY: number | null;
 
   constructor(
     screenWidth: number,
@@ -98,6 +100,8 @@ class ScreenInputHandler {
     this.hoverScratchElements = [];
     this.lastMouseMoveTime = 0;
     this.mouseMoveThrottle = 1; // was 11ms. throttled way less cause it seems to make no difference anyway?
+    this.lastMoveX = null;
+    this.lastMoveY = null;
   }
 
   getDownstreamChain(element: Element | null, chain: Element[]): Element[] {
@@ -175,65 +179,93 @@ class ScreenInputHandler {
     element.dispatchEvent(event);
   }
 
-  handleMouseMove(element: Element | null, x: number, y: number) {
-    // Manual hover tracking needed because CSS :hover doesn't activate
-    // when we synthesize events from coordinate data
-    if (element !== this.lastHoverElement) {
-      const newChain = this.getDownstreamChain(
-        element,
-        this.hoverScratchElements,
-      );
-      const oldChain = this.hoveredElements;
+  // Manual hover tracking needed because CSS :hover doesn't activate
+  // when we synthesize events from coordinate data
+  applyHoverTransition(element: Element | null, x: number, y: number) {
+    if (element === this.lastHoverElement) return;
 
-      // Remove .hovered from elements no longer in the chain
-      if (this.enableHover) {
-        for (const el of oldChain) {
-          if (!this.containsElement(newChain, el)) {
-            el.classList.remove("hovered");
-          }
+    const newChain = this.getDownstreamChain(
+      element,
+      this.hoverScratchElements,
+    );
+    const oldChain = this.hoveredElements;
+
+    // Remove .hovered from elements no longer in the chain
+    if (this.enableHover) {
+      for (const el of oldChain) {
+        if (!this.containsElement(newChain, el)) {
+          el.classList.remove("hovered");
         }
       }
-
-      // Dispatch leave event to previous direct element only
-      if (
-        this.lastHoverElement &&
-        !this.containsElement(newChain, this.lastHoverElement)
-      ) {
-        const leaveEvent = new MouseEvent("mouseleave", {
-          bubbles: false,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          view: window,
-        });
-        this.lastHoverElement.dispatchEvent(leaveEvent);
-      }
-
-      // Add .hovered to new elements in the chain
-      if (this.enableHover) {
-        for (const el of newChain) {
-          if (!this.containsElement(oldChain, el)) {
-            el.classList.add("hovered");
-          }
-        }
-      }
-
-      // Dispatch enter event to new direct element only
-      if (element && !this.containsElement(oldChain, element)) {
-        const enterEvent = new MouseEvent("mouseenter", {
-          bubbles: false,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          view: window,
-        });
-        element.dispatchEvent(enterEvent);
-      }
-
-      this.lastHoverElement = element;
-      this.hoveredElements = newChain;
-      this.hoverScratchElements = oldChain;
     }
+
+    // Dispatch leave event to previous direct element only
+    if (
+      this.lastHoverElement &&
+      !this.containsElement(newChain, this.lastHoverElement)
+    ) {
+      const leaveEvent = new MouseEvent("mouseleave", {
+        bubbles: false,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        view: window,
+      });
+      this.lastHoverElement.dispatchEvent(leaveEvent);
+    }
+
+    // add hover to new elements in the chain
+    if (this.enableHover) {
+      for (const el of newChain) {
+        if (!this.containsElement(oldChain, el)) {
+          el.classList.add("hovered");
+        }
+      }
+    }
+
+    // Dispatch enter event to new direct element only
+    if (element && !this.containsElement(oldChain, element)) {
+      const enterEvent = new MouseEvent("mouseenter", {
+        bubbles: false,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        view: window,
+      });
+      element.dispatchEvent(enterEvent);
+    }
+
+    this.lastHoverElement = element;
+    this.hoveredElements = newChain;
+    this.hoverScratchElements = oldChain;
+  }
+
+  handleMouseMove(element: Element | null, x: number, y: number) {
+    // Fast cursor motion delivers widely-spaced samples
+    // while resolving hover only at each sample skips every element crossed between samples, so their hover never gets tracked
+    // to fix, we walk our move segment and resolve along it
+    const px = this.lastMoveX;
+    const py = this.lastMoveY;
+
+    if (px !== null && py !== null && (px !== x || py !== y)) {
+      const dx = x - px;
+      const dy = y - py;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // capped so a huge jump stays bounded
+      const steps = Math.min(Math.ceil(dist / 8), 64);
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const sx = Math.round(px + dx * t);
+        const sy = Math.round(py + dy * t);
+        const stepEl = document.elementFromPoint(sx, sy);
+        this.applyHoverTransition(stepEl, sx, sy);
+      }
+    }
+
+    this.applyHoverTransition(element, x, y);
+
+    this.lastMoveX = x;
+    this.lastMoveY = y;
 
     // Throttle raw mousemove
     const now = Date.now();
@@ -303,6 +335,8 @@ class ScreenInputHandler {
     }
     this.lastHoverElement = null;
     this.hoveredElements.length = 0;
+    this.lastMoveX = null;
+    this.lastMoveY = null;
   }
 
   handleWheel(element: Element | null, x: number, y: number, deltaY: number) {
