@@ -1,28 +1,33 @@
 #!/usr/bin/env node
 
-const ts = require("typescript");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const prettier = require("prettier");
 
-const SRC = path.join(__dirname, "ui/modules/screenInput.ts");
 const OUT = path.join(__dirname, "ui/modules/screenInput.js");
+const TSC = path.join(
+  path.dirname(require.resolve("typescript/package.json")),
+  "bin/tsc",
+);
 
 const GENERATED_FILE_HEADER = `/**
  * !!! DO NOT EDIT MANUALLY !!!
  */
 `;
 
-const { outputText } = ts.transpileModule(fs.readFileSync(SRC, "utf8"), {
-  compilerOptions: {
-    target: ts.ScriptTarget.ES2020,
-    module: ts.ModuleKind.Preserve, // a real export would ship as-is and break the script tag
+execFileSync(
+  process.execPath,
+  [TSC, "-p", path.join(__dirname, "tsconfig.build.json")],
+  {
+    stdio: "inherit",
   },
-  fileName: "screenInput.ts",
-});
+);
 
 (async () => {
-  const js = await prettier.format(outputText, { parser: "babel" });
+  const js = await prettier.format(fs.readFileSync(OUT, "utf8"), {
+    parser: "babel",
+  });
   fs.writeFileSync(OUT, GENERATED_FILE_HEADER + js, "utf8");
   console.log(`Built: ${OUT}`);
 })();
