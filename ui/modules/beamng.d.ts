@@ -304,8 +304,9 @@ export interface BeamNGElectrics {
 type ElectricsValue = number | boolean | string | null;
 type ElectricsSchema = Partial<BeamNGElectrics> &
   Record<string, ElectricsValue | Record<string, unknown>>;
-type PowertrainSchema = Record<string, Record<string, number>>;
-type CustomModulesSchema = Record<string, Record<string, any>>;
+type DeviceSchema = Record<string, number | boolean | string | null>;
+type PowertrainSchema = Record<string, DeviceSchema>;
+type CustomModulesSchema = Record<string, DeviceSchema>;
 
 export interface ScreenDataSchema {
   electrics?: ElectricsSchema;
@@ -314,12 +315,12 @@ export interface ScreenDataSchema {
 }
 
 type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
-type ScreenDataInstance<T extends ScreenDataSchema> = DeepWriteable<T>;
+export type ScreenDataInstance<T extends ScreenDataSchema> = DeepWriteable<T>;
 
 declare global {
   function initScreenInput(
-    width?: number | SifConfig,
-    height?: number,
+    width?: number | SifConfig | null,
+    height?: number | null,
     screenId?: string | null,
     options?: SifOptions,
   ): void;
@@ -389,7 +390,7 @@ declare global {
     _sifConfig?: SifConfig;
     screenInput: {
       onInput: (eventData: CoordinateEventData) => void;
-      callLua: (functionName: string, args: unknown) => void;
+      callLua: (functionName: string, args?: unknown) => void;
       onHover: (data: { boxId?: string | null } | string | null) => void;
       onTrigger?: (eventData: TriggerEventData) => void;
     };

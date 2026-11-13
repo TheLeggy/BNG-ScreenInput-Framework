@@ -15,6 +15,7 @@ This manual covers everything you need to know about using the Screen Input fram
    - [Trigger Boxes](#trigger-boxes-configtype-triggerboxes)
    - [Trigger Volumes](#trigger-volumes-configtype-triggers)
    - [Receiving Vehicle Data](#receiving-vehicle-data)
+   - [Declaring Vehicle Data from the Screen](#declaring-vehicle-data-from-the-screen)
 3. [JavaScript API](#javascript-api)
    - [Screen Input Events](#screen-input-events)
    - [Trigger Events](#trigger-events)
@@ -112,7 +113,7 @@ A few things worth knowing:
 
 - Bundlers strip types without checking them. Use your editor (or `tsc --noEmit`) for that.
 - Some types will need to be declared manually. Several base game and the framework's types are included in a definitions file. See the [TypeScript](#typescript) section below for details.
-- `displayData` is used differently in the TypeScript setup. See the [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript) section for details.
+- `defineScreenData()` returns typed vehicle data, with autocomplete for electrics keys. See the [Declaring Vehicle Data from the Screen](#declaring-vehicle-data-from-the-screen) section for details.
 
 ---
 
@@ -320,13 +321,15 @@ window.updateData = (data) => {
 
 **Important note:** This is standard BeamNG functionality and is not limited to the framework
 
-### Receiving Vehicle Data in TypeScript
+If you'd rather keep the list of data next to the code that uses it, see [Declaring Vehicle Data from the Screen](#declaring-vehicle-data-from-the-screen).
 
-Screens written in TypeScript can use `defineScreenData()` instead of raw `displayData` in jbeam. It subscribes to `electric`, `powertrain`, and `customModules`, declares them from the screen side with full type inference, and automatically keeps the returned object up to date.
+### Declaring Vehicle Data from the Screen
 
-```typescript
+Instead of listing `displayData` in jbeam, a screen can call `defineScreenData()` to declare what it needs. It subscribes to `electrics`, `powertrain`, and `customModules` from the screen side, and automatically keeps the returned object up to date. The values you pass in are the defaults until the first update arrives.
+
+```javascript
 const data = defineScreenData({
-  electrics: { rpm: 0, gear: 0, wheelspeed: 0 },
+  electrics: { rpm: 0, gear: "N", wheelspeed: 0 },
   powertrain: {
     mainEngine: { outputTorque1: 0, instantEngineLoad: 0 },
     gearbox: { gearIndex: 0 },
@@ -354,7 +357,7 @@ window.updateData = () => {
 };
 ```
 
-`data.electrics.rpm`, `data.powertrain.mainEngine.outputTorque1`, and other returned fields are typed and your editor knows the shape. Unlike in the JavaScript path, where you would need to read from the `updateData` parameter, `data` is already kept up to date.
+Unlike the `updateData` parameter, `data` is kept up to date on its own, so you can read it anywhere, not just inside `updateData`. In TypeScript, `data.electrics.rpm`, `data.powertrain.mainEngine.outputTorque1`, and the other returned fields are typed, and known electrics keys autocomplete from the `BeamNGElectrics` interface in `beamng.d.ts`.
 
 For `powertrain`, each key is a device name (such as `mainEngine` or `gearbox`) and each nested key is a property on that device. For `customModules`, each key is a controller name under `gauges/customModules/`, and those controllers must be loaded by a jbeam somewhere in the vehicle.
 
@@ -528,43 +531,31 @@ The sections above apply equally to TypeScript screens. A few things behave diff
 
 **Callback assignment** - assign at module scope. The framework installs no-op defaults for `updateData` and `updateMode` so BeamNG never calls into undefined while your script is still loading.
 
-**Vehicle data** - use `defineScreenData()` instead of reading from the `updateData` parameter. See [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript).
+**Vehicle data** - `defineScreenData()` infers the shape of the returned data from the schema you pass in, and electrics keys autocomplete with their game types. See [Declaring Vehicle Data from the Screen](#declaring-vehicle-data-from-the-screen).
 
 **Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Out of the box, your editor (like VS Code) won't know what `defineScreenData` or the standard `beamng` globals actually are.
 
-To fix "Cannot find name" errors, eliminate red squiggly lines, and get full autocompletion, you must explicitly link the `.d.ts` file so your editor can find it.
+To fix "Cannot find name" errors, eliminate red squiggly lines, and get full autocompletion, add the framework's `beamng.d.ts` to your project's `tsconfig.json`. Point at the file where the framework already sits on disk instead of copying it, so your types stay in step with the framework you actually run:
 
-If you're bundling with esbuild or Vite, you likely already have a `tsconfig.json` somewhere in your project. The `tsconfig.json` approach below may fit naturally if that config's `include` can reach `ui/modules/beamng.d.ts` from your workspace root. Otherwise, the local copy or relative path approaches are simpler and don't depend on your workspace layout.
+```json
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "src/**/*.ts",
+    "../BNG-ScreenInput-Framework/ui/modules/beamng.d.ts"
+  ]
+}
+```
 
-There are three primary ways to do this:
+This example assumes your mod and the framework are both unpacked side by side in `mods/unpacked/`, so adjust the second path to wherever the framework lives on your machine. Only your editor and compiler read it, and nothing from the framework ends up inside your mod.
 
-1. **Local Copy (Recommended)** - Copy the `beamng.d.ts` file from `ui/modules/` directly into your vehicle's screen folder next to your `.ts` scripts. Then just link it like this at line 1 of every `.ts` file:
+If you only have the framework as a zip, copy `beamng.d.ts` into your project and list that path instead. Re-copy it whenever you update the framework, or your types will quietly drift from what the framework actually does.
 
-   ```typescript
-   /// <reference path="./beamng.d.ts" />
-   ```
-
-2. **Relative Path** - Point directly back to the framework's core file from your vehicle folder's depth at the top of every file. Depending on how many folders deep you are, it looks something like this:
-
-   ```typescript
-   /// <reference path="../../../../ui/modules/beamng.d.ts" />
-   ```
-
-   Note: You will need to unpack the Screen Input framework into your mod folder to use this method.
-
-3. **`tsconfig.json` (Cleanest / Advanced)** - If you don't want to copy files or add triple-slash references to the top of every single script, you can create a standard `tsconfig.json` file in your mod's root folder. This tells VS Code (or your IDE of choice) exactly where to find the framework types globally:
-   ```json
-   {
-     "compilerOptions": {
-       "target": "es2022",
-       "lib": ["es2022", "dom"],
-       "moduleResolution": "bundler"
-     },
-     "include": ["**/*.ts", "ui/modules/beamng.d.ts"]
-   }
-   ```
-
-Types and comments are stripped when your screen is compiled, so these triple-slash references are strictly for your editor to help you code.
+Everything the framework adds to `window` is declared globally, so you don't need imports to call `defineScreenData` or `initScreenInput`. The interfaces (`SifConfig`, `BeamNGElectrics`, and so on) are exported as well, so `import type` works if you want them for your own annotations.
 
 ---
 

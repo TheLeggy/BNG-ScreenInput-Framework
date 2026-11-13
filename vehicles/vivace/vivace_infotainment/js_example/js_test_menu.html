@@ -412,7 +412,10 @@
 
       document.addEventListener("beamng:trigger", (event) => {
         const { id, action, duration, deltaX, deltaY } = event.detail;
-        lastAction.textContent = `Trigger: ${id} ${action}`;
+        let text = `Trigger: ${id} ${action}`;
+        if (duration !== undefined) text += ` ${duration.toFixed(2)}s`;
+        if (deltaX !== undefined) text += ` (${deltaX.toFixed(0)}, ${deltaY.toFixed(0)})`;
+        lastAction.textContent = text;
       });
 
       document.addEventListener("beamng:trigger:click", (event) => {
@@ -424,7 +427,7 @@
       });
 
       // Required for BeamNG vehicle controller
-      window.setup = function (config) {
+      window.setup = function () {
         window.initScreenInput({enableHover: true});
       };
       window.updateData = function (data) {};

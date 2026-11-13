@@ -7,63 +7,20 @@
  * the flexibility to handle more complex interactions when needed.
  */
 
-export interface CoordinateEventData {
-  type:
-    | "click"
-    | "mousedown"
-    | "mouseup"
-    | "mousemove"
-    | "mouseenter"
-    | "mouseleave"
-    | "wheel";
-  x: number;
-  y: number;
-  screenId?: string;
-  button?: number;
-  deltaX?: number;
-  deltaY?: number;
-  pixelX?: number;
-  pixelY?: number;
-}
+import type {
+  CoordinateEventData,
+  ScreenDataInstance,
+  ScreenDataSchema,
+  SifConfig,
+  SifOptions,
+  TriggerEventData,
+} from "./beamng";
 
-export interface TriggerEventData {
-  id: string;
-  action?: string;
-  duration?: number;
-  deltaX?: number;
-  deltaY?: number;
-}
-
-export interface PersistCallbackData {
+interface PersistCallbackData {
   type: "loaded" | "merged" | "exists" | "plate" | "users" | "source";
   callbackId: string;
   data: any;
   sources?: any;
-}
-
-export interface SifConfig {
-  displayWidth?: number;
-  displayHeight?: number;
-  screenId?: string;
-  [key: string]: any;
-}
-
-type ElectricsSchema = Record<string, number | boolean | string | null>;
-type DeviceSchema = Record<string, number | boolean | string | null>;
-type PowertrainSchema = Record<string, DeviceSchema>;
-type CustomModulesSchema = Record<string, DeviceSchema>;
-
-export interface ScreenDataSchema {
-  electrics?: ElectricsSchema;
-  powertrain?: PowertrainSchema;
-  customModules?: CustomModulesSchema;
-}
-
-type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
-type ScreenDataInstance<T extends ScreenDataSchema> = DeepWriteable<T>;
-
-export interface SifOptions {
-  enableHover?: boolean;
 }
 
 class ScreenInputHandler {
@@ -448,7 +405,12 @@ function registerCefCallback(
  * @param {string} [screenId] - Screen ID
  * @param {Object} [options] - { enableHover: boolean }
  */
-window.initScreenInput = function (width, height, screenId, options) {
+window.initScreenInput = function (
+  width?: number | SifConfig | null,
+  height?: number | null,
+  screenId?: string | null,
+  options?: SifOptions,
+) {
   let resolvedWidth: number,
     resolvedHeight: number,
     resolvedScreenId: string | null | undefined,
@@ -604,7 +566,7 @@ window.screenInput = {
    *   end
    * end
    */
-  callLua: function (functionName, args) {
+  callLua: function (functionName: string, args?: unknown) {
     if (!luaBridgeAvailable()) {
       console.warn("beamng.sendEngineLua not available");
       return;
@@ -638,7 +600,7 @@ window.screenInput = {
    * @param {number} [eventData.deltaX] - Drag delta X
    * @param {number} [eventData.deltaY] - Drag delta Y
    */
-  onTrigger: function (eventData) {
+  onTrigger: function (eventData: TriggerEventData) {
     if (!eventData || !eventData.id) {
       return;
     }

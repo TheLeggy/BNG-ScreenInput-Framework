@@ -1,6 +1,7 @@
 /**
  * !!! DO NOT EDIT MANUALLY !!!
- *
+ */
+/**
  * Translates BeamNG coordinate events to browser-like events
  *
  * Part of the screenInput framework - makes vehicle HTML displays actually usable
