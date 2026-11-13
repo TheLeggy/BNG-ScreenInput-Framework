@@ -203,11 +203,11 @@ Trigger boxes are the screen interaction areas that translate 3D raycasts into D
 
 - `id` - Unique identifier for this trigger box (optional, mainly for debugging)
 - `screenId` - Material name that this box controls
-- `pos` - Position relative to reference plane (or vehicle origin if no refPlane)
+- `pos` - Position relative to reference plane (or vehicle origin when no plane applies, see `refPlane`)
 - `scale` - Width of the trigger box in meters
 - `depth` - Thickness of the trigger box (defaults to 0.0005m if not specified, though there is no reason to add your own. Anything greater than 0 works, and as low as 0.0001 has been tested.)
 - `rot` - Rotation relative to reference plane (optional, defaults to 0,0,0)
-- `refPlane` - ID of reference plane to use (optional, uses absolute coordinates if omitted)
+- `refPlane` - ID of reference plane to use (optional, falls back to plane `"0"` if omitted or unknown, and to absolute coordinates if there is no plane `"0"`)
 - `translateX` - Horizontal coordinate offset multiplier (optional, defaults to 0)
 - `translateY` - Vertical coordinate offset multiplier (optional, defaults to 0)
 
@@ -248,7 +248,7 @@ Trigger volumes are physical 3D spaces that detect interaction events (press, cl
 - `pos` - Position relative to reference plane
 - `size` - Dimensions in meters (x = width, y = depth, z = height)
 - `rot` - Rotation relative to reference plane (optional)
-- `refPlane` - ID of reference plane to use (optional)
+- `refPlane` - ID of reference plane to use (optional, same fallback as trigger boxes)
 
 **Event types:**
 
@@ -473,7 +473,7 @@ document.getElementById("myButton").addEventListener("click", function () {
 **Example (Vehicle Lua controller):**
 
 ```lua
-local function init(jbeamData)
+local function initSecondStage()
   if screenInput then
     screenInput.registerLuaCallback("updateSetting", function(args)
       -- Do something with args.value
@@ -481,7 +481,15 @@ local function init(jbeamData)
     end)
   end
 end
+
+local function reset()
+end
+
+M.initSecondStage = initSecondStage
+M.reset = reset
 ```
+
+Register in `initSecondStage`, not `init`. Controllers load in no fixed order, so `screenInput` may not exist yet when your `init` runs. Give the controller a `reset` function as well, even an empty one. Without it, BeamNG runs `init` and `initSecondStage` again on every vehicle reset.
 
 See `vehicles/vivace/lua/controller/triggerExample.lua` for a working example.
 

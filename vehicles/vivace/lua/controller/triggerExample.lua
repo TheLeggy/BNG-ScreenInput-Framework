@@ -1,29 +1,38 @@
 local M = {}
 
 local acMaxSound
-local soundNode
 local isPlaying = false
 
-local function playSound(args)
+local function setPlaying(playing)
+  isPlaying = playing
   if acMaxSound then
-    isPlaying = not isPlaying
-    local volume = isPlaying and 1.0 or 0.0
-    obj:setVolumePitch(acMaxSound, volume, 1.0)
+    obj:setVolumePitch(acMaxSound, playing and 1 or 0, 1)
   end
 end
 
-local function init(jbeamData)
-  soundNode = beamstate.nodeNameMap["ref"] or 0
+local function playSound()
+  setPlaying(not isPlaying)
+end
+
+local function init()
+  local soundNode = beamstate.nodeNameMap["ref"] or 0
   acMaxSound = obj:createSFXSource("vehicles/vivace/art/ac.wav", "AudioCloseLoop3D", "ac_max_loop", soundNode)
-  if acMaxSound then
-    obj:setVolumePitch(acMaxSound, 0.0, 1.0)
-  end
-  
+  setPlaying(false)
+end
+
+-- screenInput can load after this controller's init
+local function initSecondStage()
   if screenInput then
     screenInput.registerLuaCallback("playSound", playSound)
-    screenInput.registerLuaCallback("customAction", customAction)
   end
+end
+
+-- the game reruns both init stages on every vehicle reset for a controller without a reset
+local function reset()
+  setPlaying(false)
 end
 
 M.init = init
+M.initSecondStage = initSecondStage
+M.reset = reset
 return M

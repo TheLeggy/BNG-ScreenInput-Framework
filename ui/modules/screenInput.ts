@@ -492,6 +492,9 @@ if (!Object.getOwnPropertyDescriptor(window, "updateData")?.get) {
   });
 }
 
+// the screen id only arrives with setup()
+const _subscriptionsAwaitingSetup: Array<(screenId?: string) => void> = [];
+
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
 const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
   window,
@@ -503,6 +506,9 @@ if (!_originalSetupDescriptor) {
     get() {
       return function (config: any) {
         (window as any)._sifConfig = config;
+        for (const send of _subscriptionsAwaitingSetup.splice(0)) {
+          send(config?.screenId);
+        }
         _setupFn(config);
       };
     },
@@ -1066,10 +1072,29 @@ function defineScreenData<T extends ScreenDataSchema>(
       sub.customModules = rows;
     }
 
-    const json = escapeLuaArg(JSON.stringify(sub));
-    beamng.sendEngineLua(
-      `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
-    );
+    // without a screen id every screen in the vehicle takes the subscription
+    const send = (screenId?: string) => {
+      const json = escapeLuaArg(
+        JSON.stringify(screenId ? { ...sub, screenId } : sub),
+      );
+      beamng.sendEngineLua(
+        `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
+      );
+    };
+
+    if (window._sifConfig || _originalSetupDescriptor) {
+      send(window._sifConfig?.screenId);
+    } else {
+      _subscriptionsAwaitingSetup.push(send);
+      // a page reloaded on its own never gets another setup()
+      setTimeout(() => {
+        const index = _subscriptionsAwaitingSetup.indexOf(send);
+        if (index !== -1) {
+          _subscriptionsAwaitingSetup.splice(index, 1);
+          send();
+        }
+      }, 3000);
+    }
   }
 
   // Intercept window.updateData assignments so the merge wrapper is installed
@@ -1153,4 +1178,4 @@ function defineScreenData<T extends ScreenDataSchema>(
   window.screenInput.callLua(functionName, args);
 };
 
-// mrow~
+// woof

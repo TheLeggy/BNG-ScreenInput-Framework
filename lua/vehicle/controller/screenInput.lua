@@ -4,193 +4,149 @@
 
 local M = {}
 
-local gaugeHTMLTextures = {}
-local serviceExtension = ""
+local htmlTextures = {}
+local luaCallbackHandlers = {}
 local triggerConfigPath = ""
 local drawBoxes = false
-
 local playerSeated = false
 
--- Send JS calls to all registered HTML screens
+-- this runs in the game engine's Lua
+local loadConfigCommand = [[
+if screenService then
+    local files = FS:findFiles(basePath, "*.jsonc", 0, true, false)
+    for _, file in ipairs(FS:findFiles(basePath, "*.json", 0, true, false)) do
+        table.insert(files, file)
+    end
+    for _, filepath in ipairs(files) do
+        local content = readFile(filepath)
+        if content and content:match('"$configType"%s*:%s*"triggerBoxes"') then
+            screenService.loadBoxes(filepath)
+            screenService.loadTriggers(filepath)
+            break
+        end
+    end
+end
+]]
+
 local function callJS(...)
-    for i = 1, #gaugeHTMLTextures do
-        gaugeHTMLTextures[i]:callJS(...)
-    end
-end
-
-local function onPlayersChanged(active)
-    if active then
-        obj:queueGameEngineLua([[
-            if ]] .. serviceExtension .. [[ then
-                ]] .. serviceExtension .. [[.setFocusCar(]] .. objectId .. [[)
-                ]] .. serviceExtension .. [[.drawBoxes = ]] .. tostring(drawBoxes) .. [[
-            end
-        ]])
-    end
-end
-
-local function updateGFX(dt)
-    if playerInfo.anyPlayerSeated ~= playerSeated then
-        onPlayersChanged(playerInfo.anyPlayerSeated)
-        playerSeated = playerInfo.anyPlayerSeated
+    for i = 1, #htmlTextures do
+        htmlTextures[i]:callJS(...)
     end
 end
 
 local function addScreen(htmlTexture)
-    gaugeHTMLTextures[#gaugeHTMLTextures + 1] = htmlTexture
-end
-
-local function initLastStage()
-    -- Load trigger boxes from configured path
-    -- loadTriggers() will find the triggers file in the same directory
-    if not triggerConfigPath or triggerConfigPath == "" then
-        return -- No path configured, skip loading
-    end
-
-    obj:queueGameEngineLua([[
-        if ]] .. serviceExtension .. [[ then
-            local basePath = "]] .. triggerConfigPath .. [["
-            local files = FS:findFiles(basePath, "*.json", 0, true, false)
-            local jsoncFiles = FS:findFiles(basePath, "*.jsonc", 0, true, false)
-            
-            -- Combine json and jsonc files
-            for _, file in ipairs(jsoncFiles) do
-                table.insert(files, file)
-            end
-
-            -- Find the triggerBoxes file
-            for _, filepath in ipairs(files) do
-                local content = readFile(filepath)
-                if content and content:match('"$configType"%s*:%s*"triggerBoxes"') then
-                    -- Load trigger boxes (screen interaction areas)
-                    ]] .. serviceExtension .. [[.loadBoxes(filepath)
-                    -- Load triggers (physical volumes) - searches same directory
-                    ]] .. serviceExtension .. [[.loadTriggers(filepath)
-                    break
-                end
-            end
-        end
-    ]])
-end
-
-local function reset()
-    -- Reset handled by screenService
+    htmlTextures[#htmlTextures + 1] = htmlTexture
 end
 
 local function init(jbeamData)
-    serviceExtension = "screenService"
-
-    -- Configure trigger config path from jbeam (optional)
-    -- Defaults to vehicles/{model}/interactive_screen/ if not specified
-    if jbeamData and jbeamData.triggerConfigPath then
-        triggerConfigPath = jbeamData.triggerConfigPath
-    else
-        local vehModel = v.data.model
-        triggerConfigPath = "vehicles/" .. vehModel .. "/interactive_screen/"
-    end
-
+    triggerConfigPath = jbeamData and jbeamData.triggerConfigPath or
+                            ("vehicles/" .. v.data.model .. "/interactive_screen/")
     drawBoxes = jbeamData and jbeamData.drawBoxes or false
 
-    -- Reload the screenService extension
+    -- this is also what loads the extension the first time
     obj:queueGameEngineLua("extensions.reload('screenService')")
 end
 
-M.reset = reset
-M.init = init
-M.initLastStage = initLastStage
-M.addScreen = addScreen
-M.updateGFX = updateGFX
+local function initLastStage()
+    if triggerConfigPath == "" then
+        return
+    end
+    obj:queueGameEngineLua(string.format("local basePath = %q\n", triggerConfigPath) .. loadConfigCommand)
+end
 
--- Coordinate-based input events (mouse clicks, drags, etc.)
+-- the game reruns init on every vehicle reset for a controller without a reset
+local function reset()
+end
+
+local function updateGFX()
+    local seated = playerInfo.anyPlayerSeated
+    if seated == playerSeated then
+        return
+    end
+    playerSeated = seated
+
+    if seated then
+        obj:queueGameEngineLua(string.format(
+            "if screenService then screenService.setFocusCar(%d) screenService.drawBoxes = %s end", objectId,
+            tostring(drawBoxes)))
+    end
+end
+
 local function inputCoordinate(eventData)
     callJS("screenInput.onInput", eventData)
 end
 
-M.inputCoordinate = inputCoordinate
-
--- Hover state changes (mouse enter/leave trigger boxes)
 local function onHover(boxId)
     callJS("screenInput.onHover", boxId)
 end
 
-M.onHover = onHover
-
--- Trigger events (press, click, hold, drag on trigger volumes)
 local function onTrigger(eventData)
     callJS("screenInput.onTrigger", eventData)
 end
 
-M.onTrigger = onTrigger
-
--- Data load callbacks
-local function onPersistLoaded(callbackId, packedData)
-    local data = lpack.decode(packedData)
-    callJS("persistCallback", {
-        type = "loaded",
-        callbackId = callbackId,
-        data = data
-    })
-end
-
-M.onPersistLoaded = onPersistLoaded
-
--- Data merged callbacks
-local function onPersistMerged(callbackId, packedData, packedSources)
-    local data = lpack.decode(packedData)
-    local sources = lpack.decode(packedSources)
-    callJS("persistCallback", {
-        type = "merged",
-        callbackId = callbackId,
-        data = data,
-        sources = sources
-    })
-end
-
-M.onPersistMerged = onPersistMerged
-
--- Generic data callback handler
 local function onPersistCallback(dataType, callbackId, packedData)
-    local data = lpack.decode(packedData)
     callJS("persistCallback", {
         type = dataType,
         callbackId = callbackId,
-        data = data
+        data = lpack.decode(packedData)
     })
 end
 
-M.onPersistCallback = onPersistCallback
-
--- Simple sound test function - calls testSound controller if available
-local function playTestSound()
-    if controller.testSound and controller.testSound.playClick then
-        controller.testSound.playClick()
-    end
+local function onPersistLoaded(callbackId, packedData)
+    onPersistCallback("loaded", callbackId, packedData)
 end
 
-M.playTestSound = playTestSound
-
-local luaCallbackHandlers = {}
+local function onPersistMerged(callbackId, packedData, packedSources)
+    callJS("persistCallback", {
+        type = "merged",
+        callbackId = callbackId,
+        data = lpack.decode(packedData),
+        sources = lpack.decode(packedSources)
+    })
+end
 
 local function registerLuaCallback(functionName, handler)
-    if not luaCallbackHandlers[functionName] then
-        luaCallbackHandlers[functionName] = {}
+    local handlers = luaCallbackHandlers[functionName]
+    if not handlers then
+        handlers = {}
+        luaCallbackHandlers[functionName] = handlers
     end
-    table.insert(luaCallbackHandlers[functionName], handler)
+
+    -- a controller without a reset registers again on every vehicle reset
+    for _, registered in ipairs(handlers) do
+        if registered == handler then
+            return
+        end
+    end
+    table.insert(handlers, handler)
 end
 
 local function onLuaCallback(functionName, args)
     local handlers = luaCallbackHandlers[functionName]
-    if handlers then
-        for _, h in ipairs(handlers) do
-            h(args)
-        end
-    else
+    if not handlers then
         log("W", "screenInput.onLuaCallback", "No handler registered for: " .. tostring(functionName))
+        return
+    end
+    for _, handler in ipairs(handlers) do
+        handler(args)
     end
 end
 
+M.init = init
+M.initLastStage = initLastStage
+M.reset = reset
+M.updateGFX = updateGFX
+M.addScreen = addScreen
+
+M.inputCoordinate = inputCoordinate
+M.onHover = onHover
+M.onTrigger = onTrigger
+M.onPersistLoaded = onPersistLoaded
+M.onPersistMerged = onPersistMerged
+M.onPersistCallback = onPersistCallback
 M.registerLuaCallback = registerLuaCallback
 M.onLuaCallback = onLuaCallback
 
+-- the game engine and the other controllers find us through this global
 rawset(_G, "screenInput", M)
 return M

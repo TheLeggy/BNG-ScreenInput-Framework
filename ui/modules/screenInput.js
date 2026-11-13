@@ -393,6 +393,8 @@ if (!Object.getOwnPropertyDescriptor(window, "updateData")?.get) {
     configurable: true,
   });
 }
+// the screen id only arrives with setup()
+const _subscriptionsAwaitingSetup = [];
 // Intercepts `window.setup = fn` to capture config for initScreenInput() no-argument fallback
 const _originalSetupDescriptor = Object.getOwnPropertyDescriptor(
   window,
@@ -404,6 +406,9 @@ if (!_originalSetupDescriptor) {
     get() {
       return function (config) {
         window._sifConfig = config;
+        for (const send of _subscriptionsAwaitingSetup.splice(0)) {
+          send(config?.screenId);
+        }
         _setupFn(config);
       };
     },
@@ -873,10 +878,28 @@ function defineScreenData(schema) {
       }
       sub.customModules = rows;
     }
-    const json = escapeLuaArg(JSON.stringify(sub));
-    beamng.sendEngineLua(
-      `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
-    );
+    // without a screen id every screen in the vehicle takes the subscription
+    const send = (screenId) => {
+      const json = escapeLuaArg(
+        JSON.stringify(screenId ? { ...sub, screenId } : sub),
+      );
+      beamng.sendEngineLua(
+        `screenService.callVehicleLua("subscribeData", jsonDecode('${json}'))`,
+      );
+    };
+    if (window._sifConfig || _originalSetupDescriptor) {
+      send(window._sifConfig?.screenId);
+    } else {
+      _subscriptionsAwaitingSetup.push(send);
+      // a page reloaded on its own never gets another setup()
+      setTimeout(() => {
+        const index = _subscriptionsAwaitingSetup.indexOf(send);
+        if (index !== -1) {
+          _subscriptionsAwaitingSetup.splice(index, 1);
+          send();
+        }
+      }, 3000);
+    }
   }
   // Intercept window.updateData assignments so the merge wrapper is installed
   // regardless of when the user assigns their function
@@ -949,4 +972,4 @@ window.persistGetSource = persistGetSource;
 window.callVehicleLua = function (functionName, args) {
   window.screenInput.callLua(functionName, args);
 };
-// mrow~
+// woof

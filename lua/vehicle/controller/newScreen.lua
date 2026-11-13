@@ -13,13 +13,26 @@ M.type = "auxiliary"
 
 local htmlTexture = require("htmlTexture")
 
-local controllerName = nil
-local screenName = nil
-local htmlPath = nil
-local htmlTextureInstance = nil
-
 local updateFPS = 90
 local dataUpdateInterval = 1 / 24
+local unitDefaults = {
+    uiUnitLength = "metric",
+    uiUnitTemperature = "c",
+    uiUnitWeight = "kg",
+    uiUnitTorque = "metric",
+    uiUnitPower = "hp",
+    uiUnitEnergy = "metric",
+    uiUnitConsumptionRate = "metric",
+    uiUnitVolume = "l",
+    uiUnitPressure = "bar",
+    uiUnitDate = "ger"
+}
+
+local configureScreenCommand = "if screenService and screenService.configureScreen then " ..
+                                   "screenService.configureScreen(%q, {width = %s, height = %s}) end"
+
+local controllerName = nil
+local htmlTextureInstance = nil
 local dataTimer = 0
 local screenData = {
     electrics = {},
@@ -39,8 +52,7 @@ local electricsUpdate = nop
 local powertrainUpdate = nop
 local customModuleUpdate = nop
 
--- Update electrics data
-local function updateElectricsData(dt)
+local function updateElectricsData()
     local values = electrics.values
     local data = screenData.electrics
     for i = 1, #electricsConfig do
@@ -49,48 +61,50 @@ local function updateElectricsData(dt)
     end
 end
 
-local function updatePowertrainData(dt)
-    for _, v in ipairs(powertrainConfig) do
-        for _, n in ipairs(v.properties) do
-            screenData.powertrain[v.name][n] = v.device[n] or 0
+local function updatePowertrainData()
+    for _, entry in ipairs(powertrainConfig) do
+        local data = screenData.powertrain[entry.name]
+        for _, property in ipairs(entry.properties) do
+            data[property] = entry.device[property] or 0
         end
     end
 end
 
 local function updateCustomModuleData(dt)
-    for _, module in ipairs(customModuleConfig) do
-        module.controller.updateGaugeData(screenData.customModules[module.name], dt)
+    for _, entry in ipairs(customModuleConfig) do
+        entry.controller.updateGaugeData(screenData.customModules[entry.name], dt)
     end
 end
 
--- Main update loop
 local function updateGFX(dt)
     dataTimer = dataTimer + dt
-    if htmlTextureInstance and playerInfo.anyPlayerSeated and dataTimer >= dataUpdateInterval then
-        if modePendingFlush then
-            if pendingMode then
-                htmlTextureInstance:callJS("updateMode", pendingMode)
-            end
-            modePendingFlush = false
-        end
-
-        electricsUpdate(dt)
-        powertrainUpdate(dt)
-        customModuleUpdate(dt)
-
-        htmlTextureInstance:callJS("updateData", screenData)
-        dataTimer = dataTimer - dataUpdateInterval
+    if not htmlTextureInstance or not playerInfo.anyPlayerSeated or dataTimer < dataUpdateInterval then
+        return
     end
+    -- a long wait must not come back as a burst of updates
+    dataTimer = dataTimer % dataUpdateInterval
+
+    if modePendingFlush then
+        if pendingMode then
+            htmlTextureInstance:callJS("updateMode", pendingMode)
+        end
+        modePendingFlush = false
+    end
+
+    electricsUpdate(dt)
+    powertrainUpdate(dt)
+    customModuleUpdate(dt)
+    htmlTextureInstance:callJS("updateData", screenData)
 end
 
--- Setup electrics data sources
 local function setupElectricsData(config)
     if not config then
         return
     end
+
     electricsConfig = {}
-    for _, v in pairs(config) do
-        table.insert(electricsConfig, v)
+    for _, name in pairs(config) do
+        table.insert(electricsConfig, name)
     end
     electricsUpdate = updateElectricsData
 end
@@ -99,21 +113,21 @@ local function setupPowertrainData(config)
     if not config then
         return
     end
-    local mergedConfig = {}
-    for _, v in pairs(tableFromHeaderTable(config)) do
-        mergedConfig[v.deviceName] = mergedConfig[v.deviceName] or {}
-        table.insert(mergedConfig[v.deviceName], v.property)
+
+    local propertiesByDevice = {}
+    for _, row in pairs(tableFromHeaderTable(config)) do
+        propertiesByDevice[row.deviceName] = propertiesByDevice[row.deviceName] or {}
+        table.insert(propertiesByDevice[row.deviceName], row.property)
     end
 
     powertrainConfig = {}
-    for k, v in pairs(mergedConfig) do
-        local device = powertrain.getDevice(k)
+    for deviceName, properties in pairs(propertiesByDevice) do
+        local device = powertrain.getDevice(deviceName)
         if device then
-            table.insert(powertrainConfig, {device = device, name = k, properties = v})
-            screenData.powertrain[k] = {}
+            table.insert(powertrainConfig, {device = device, name = deviceName, properties = properties})
+            screenData.powertrain[deviceName] = {}
         end
     end
-
     powertrainUpdate = updatePowertrainData
 end
 
@@ -122,30 +136,33 @@ local function setupCustomModuleData(config)
         return
     end
 
-    local mergedConfig = {}
-    for _, v in pairs(tableFromHeaderTable(config)) do
-        mergedConfig[v.moduleName] = mergedConfig[v.moduleName] or {}
-        if v.property then
-            mergedConfig[v.moduleName][v.property] = true
+    local propertiesByModule = {}
+    for _, row in pairs(tableFromHeaderTable(config)) do
+        propertiesByModule[row.moduleName] = propertiesByModule[row.moduleName] or {}
+        if row.property then
+            propertiesByModule[row.moduleName][row.property] = true
         end
     end
 
     customModuleConfig = {}
-    for k, v in pairs(mergedConfig) do
-        local c = controller.getController("gauges/customModules/" .. k)
-        if c and c.setupGaugeData and c.updateGaugeData then
-            c.setupGaugeData(v, htmlTextureInstance)
-            table.insert(customModuleConfig, {controller = c, name = k, properties = v})
-            screenData.customModules[k] = {}
+    for moduleName, properties in pairs(propertiesByModule) do
+        local module = controller.getController("gauges/customModules/" .. moduleName)
+        if module and module.setupGaugeData and module.updateGaugeData then
+            module.setupGaugeData(properties, htmlTextureInstance)
+            table.insert(customModuleConfig, {controller = module, name = moduleName, properties = properties})
+            screenData.customModules[moduleName] = {}
         else
-            log("E", "newScreen.setupCustomModuleData", "Can't find controller: " .. k)
+            log("E", "newScreen.setupCustomModuleData", "Can't find controller: " .. moduleName)
         end
     end
-
     customModuleUpdate = updateCustomModuleData
 end
 
 local function subscribeData(sub)
+    -- every screen hears every subscription
+    if sub.screenId and sub.screenId ~= controllerName then
+        return
+    end
     if not htmlTextureInstance then
         -- dont actually know if we need this but here just in case it goes to shit
         pendingSubscription = sub
@@ -163,19 +180,19 @@ local function subscribeData(sub)
     end
 end
 
-local function reset()
-end
-
 local function init(jbeamData)
     controllerName = jbeamData.screenId or jbeamData.name
 end
 
-local function initSecondStage(jbeamData)
-    local displayData = jbeamData.displayData or {}
+local function logSetupError(problem)
+    log("E", "newScreen.initSecondStage",
+        "*** SCREENINPUT ERROR *** " .. problem .. " for screen '" .. tostring(controllerName) .. "'")
+end
 
-    local width, height
+local function initSecondStage(jbeamData)
+    local screenName, htmlPath, width, height
     if jbeamData.htmlPath ~= nil then
-        screenName = "@" .. jbeamData.screenId
+        screenName = jbeamData.screenId and "@" .. jbeamData.screenId
         htmlPath = "local://local/" .. jbeamData.htmlPath
         width = jbeamData.displayWidth
         height = jbeamData.displayHeight
@@ -194,36 +211,30 @@ local function initSecondStage(jbeamData)
     end
 
     if not width then
-        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** displayWidth missing from jbeam for screen '" .. tostring(controllerName) .. "'")
+        logSetupError("displayWidth missing from jbeam")
         return
     end
     if not height then
-        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** displayHeight missing from jbeam for screen '" .. tostring(controllerName) .. "'")
+        logSetupError("displayHeight missing from jbeam")
         return
     end
-
     if not screenName then
-        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** no material name (screenId) for screen '" .. tostring(controllerName) .. "'")
+        logSetupError("no material name (screenId)")
         return
     end
-
     if not htmlPath then
-        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** no htmlPath for screen '" .. tostring(controllerName) .. "'")
+        logSetupError("no htmlPath")
         return
     end
 
     htmlTextureInstance = htmlTexture.new(screenName, htmlPath, width, height, updateFPS)
-
-    if not htmlTextureInstance then
-        log("E", "newScreen.initSecondStage", "*** SCREENINPUT ERROR *** htmlTexture.new() failed for screen '" .. tostring(controllerName) .. "'. Material '" .. screenName .. "' may not exist on this mesh. Check screenId in jbeam matches the material name.")
-        return
-    end
 
     if screenInput then
         screenInput.addScreen(htmlTextureInstance)
         screenInput.registerLuaCallback("subscribeData", subscribeData)
     end
 
+    local displayData = jbeamData.displayData or {}
     setupElectricsData(displayData.electrics)
     setupPowertrainData(displayData.powertrain)
     setupCustomModuleData(displayData.customModules)
@@ -234,47 +245,29 @@ local function initSecondStage(jbeamData)
     end
 
     local config = {
-        uiUnitLength = settings.getValue("uiUnitLength") or "metric",
-        uiUnitTemperature = settings.getValue("uiUnitTemperature") or "c",
-        uiUnitWeight = settings.getValue("uiUnitWeight") or "kg",
-        uiUnitTorque = settings.getValue("uiUnitTorque") or "metric",
-        uiUnitPower = settings.getValue("uiUnitPower") or "hp",
-        uiUnitEnergy = settings.getValue("uiUnitEnergy") or "metric",
-        uiUnitConsumptionRate = settings.getValue("uiUnitConsumptionRate") or "metric",
-        uiUnitVolume = settings.getValue("uiUnitVolume") or "l",
-        uiUnitPressure = settings.getValue("uiUnitPressure") or "bar",
-        uiUnitDate = settings.getValue("uiUnitDate") or "ger",
         screenId = controllerName,
         displayWidth = width,
         displayHeight = height
     }
-
+    for setting, default in pairs(unitDefaults) do
+        config[setting] = settings.getValue(setting) or default
+    end
     htmlTextureInstance:callJS("setup", config)
+
+    -- the page can miss a mode that arrives this early
     modePendingFlush = true
 
-    if width and height then
-        obj:queueGameEngineLua([[
-        if screenService and screenService.configureScreen then
-            screenService.configureScreen("]] .. controllerName .. [[", {
-                width = ]] .. width .. [[,
-                height = ]] .. height .. [[
-            })
-            end
-        ]])
-    end
+    obj:queueGameEngineLua(string.format(configureScreenCommand, controllerName, width, height))
 end
 
-local function setUIMode(parameters)
-    if htmlTextureInstance then
-        pendingMode = parameters
-        htmlTextureInstance:callJS("updateMode", parameters)
-    end
+-- the game reruns both init stages on every vehicle reset for a controller without a reset
+local function reset()
 end
-
 
 local function setParameters(parameters)
-    if parameters.modeName and parameters.modeColor then
-        setUIMode(parameters)
+    if htmlTextureInstance and parameters.modeName and parameters.modeColor then
+        pendingMode = parameters
+        htmlTextureInstance:callJS("updateMode", parameters)
     end
 end
 
