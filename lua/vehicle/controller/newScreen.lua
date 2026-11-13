@@ -2,11 +2,6 @@
 -- If a copy of the bCDDL was not distributed with this
 -- file, You can obtain one at http://beamng.com/bCDDL-1.1.txt
 
--- sneppy snep snep!
-
--- Be warned (!!!!): using this code means you give
---    away your soul to the snow leopard gods!
-
 -- universal screen controller for interactive HTML displays
 -- uses effectively the same structure as the base game HTML texture system
 -- integrated specifically with screenInput framework

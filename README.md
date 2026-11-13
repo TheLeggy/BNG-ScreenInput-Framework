@@ -171,7 +171,6 @@ Complimentary JSDoc included.
 
 - **Vivace** - Working examples in `vehicles/vivace/vivace_infotainment/`
   - `js_example/` - JavaScript
-  - `ts_example/` - TypeScript with multi-file imports
 
 ---
 
@@ -186,7 +185,3 @@ Complimentary JSDoc included.
 This project is licensed under the MIT License with additional attribution and compatibility requirements. Redistributions or substantial portions of the Framework must include the original copyright notice and attribution to the project's source (https://github.com/TheLeggy/BNG-ScreenInput-Framework/). Modified distributions must take reasonable steps to avoid conflicts with the official distribution and clearly identify that they are modified.
 
 See the `LICENSE` file for the full license text and exact requirements. For detailed usage and guidance, also see the `USER_MANUAL.md`.
-
----
-
-**mrow~**

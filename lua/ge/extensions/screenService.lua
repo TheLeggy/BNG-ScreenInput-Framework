@@ -1,8 +1,3 @@
--- sneppy snep snep! 
-
--- Be warned (!!!!): using this code means you give  
---    away your soul to the snow leopard gods!
-
 -- so it's like a cool thing that makes it easy to make screens
 -- we send coordinates and related DOM events to the js 
 -- and that makes development so much easier (win for you). 
@@ -1732,4 +1727,4 @@ M.callVehicleLua = callVehicleLua
 
 return M
 
--- mrow~
+-- woof

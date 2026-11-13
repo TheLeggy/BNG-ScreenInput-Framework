@@ -8,6 +8,6 @@
   "license": "LicenseRef-BNG-ScreenInput",
   "devDependencies": {
     "prettier": "^3.8.3",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "target": "ES2020",
+    "module": "preserve" // a real export would ship as-is and break the script tag
+  },
+  "include": [],
+  "files": ["ui/modules/screenInput.ts"]
+}

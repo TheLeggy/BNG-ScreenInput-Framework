@@ -208,7 +208,7 @@
             class="content-header"
             style="font-size: 14px; margin-top: 10px; color: #888"
           >
-            Try dragging the boxes! <br /><br /></b>
+            Try dragging the boxes! <br /><br />
             These are extremely inaccurate and just for demonstration purposes! <br />
             Implement it properly in your own projects using standard javascript
           </div>
@@ -216,42 +216,42 @@
             <div
               class="draggable-box"
               data-box="1"
-              style="position: relative; left: 0px; top: 0px"
+              style="position: relative; left: 0; top: 0"
             >
               drag me
             </div>
             <div
               class="draggable-box"
               data-box="2"
-              style="position: relative; left: 0px; top: 0px"
+              style="position: relative; left: 0; top: 0"
             >
               drag me
             </div>
             <div
               class="draggable-box"
               data-box="3"
-              style="position: relative; left: 0px; top: 0px"
+              style="position: relative; left: 0; top: 0"
             >
               drag me
             </div>
             <div
               class="draggable-box"
               data-box="4"
-              style="position: relative; left: 0px; top: 0px"
+              style="position: relative; left: 0; top: 0"
             >
               drag me
             </div>
             <div
               class="draggable-box"
               data-box="5"
-              style="position: relative; left: 0px; top: 0px"
+              style="position: relative; left: 0; top: 0"
             >
               drag me
             </div>
             <div
               class="draggable-box"
               data-box="6"
-              style="position: relative; left: 0px; top: 0px"
+              style="position: relative; left: 0; top: 0"
             >
               drag me
             </div>
@@ -412,7 +412,10 @@
 
       document.addEventListener("beamng:trigger", (event) => {
         const { id, action, duration, deltaX, deltaY } = event.detail;
-        lastAction.textContent = `Trigger: ${id} ${action}`;
+        let text = `Trigger: ${id} ${action}`;
+        if (duration !== undefined) text += ` ${duration.toFixed(2)}s`;
+        if (deltaX !== undefined) text += ` (${deltaX.toFixed(0)}, ${deltaY.toFixed(0)})`;
+        lastAction.textContent = text;
       });
 
       document.addEventListener("beamng:trigger:click", (event) => {
@@ -424,7 +427,7 @@
       });
 
       // Required for BeamNG vehicle controller
-      window.setup = function (config) {
+      window.setup = function () {
         window.initScreenInput({enableHover: true});
       };
       window.updateData = function (data) {};
