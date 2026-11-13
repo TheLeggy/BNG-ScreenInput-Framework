@@ -1,5 +1,3 @@
-/// <reference path="./beamng.d.ts" />
-
 /**
  * Translates BeamNG coordinate events to browser-like events
  *
