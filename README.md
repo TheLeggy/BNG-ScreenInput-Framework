@@ -171,7 +171,6 @@ Complimentary JSDoc included.
 
 - **Vivace** - Working examples in `vehicles/vivace/vivace_infotainment/`
   - `js_example/` - JavaScript
-  - `ts_example/` - TypeScript with multi-file imports
 
 ---
 

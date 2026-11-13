@@ -59,7 +59,6 @@ declare global {
   function defineScreenData<T extends ScreenDataSchema>(
     schema: T,
   ): ScreenDataInstance<T>;
-  function loadTS(url: string): Promise<void>;
   function callVehicleLua(functionName: string, args?: unknown): void;
   function persistSave(
     filename: string,
@@ -130,7 +129,6 @@ declare global {
     setup: (config: SifConfig) => void;
     updateData: (data: any) => void;
     updateMode: (data: any) => void;
-    loadTS: typeof loadTS;
     callVehicleLua: typeof callVehicleLua;
     persistSave: typeof persistSave;
     persistLoad: typeof persistLoad;

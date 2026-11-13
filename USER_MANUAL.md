@@ -83,9 +83,7 @@ After calling `initScreenInput()`, you're done with BeamNG setup. Your display r
 
 ### TypeScript Support
 
-If you prefer TypeScript, the framework ships a JIT compiler that compiles `.ts` files directly in the vehicle's webview. This is the easiest way to get started, and it's acceptable to ship as your final output. Do note that there is still some overhead, and I have not been able to test this on low-end hardware, but there are plans to speed it up using parallelization for genuine final use.
-
-That said, the JIT path is best thought of primarily as an authoring environment. It lets you write your screen logic across multiple files using modern modular imports and exports to keep things organized, while the runtime stitches everything together at load time. Once your project grows, you may want to take that same TypeScript source and run it through a proper bundler instead, such as [esbuild](https://esbuild.github.io/) or [Vite](https://vitejs.dev/). Bundling gives you an optimized output, real minification, and also lets you import npm packages, all without changing how you write your code. For example, a minimal one-off bundle with esbuild (via `npx`) looks like:
+The framework itself is written in TypeScript, but what ships is plain JavaScript. If you prefer TypeScript for your own screens, run your source through a bundler such as [esbuild](https://esbuild.github.io/) or [Vite](https://vitejs.dev/). You get to split your screen logic across files with modern imports and exports, and bundling gives you an optimized output, real minification, and also lets you import npm packages. For example, a minimal one-off bundle with esbuild (via `npx`) looks like:
 
 ```
 npx esbuild typescript_screen.ts --bundle --outfile=typescript_screen.js --format=iife
@@ -93,29 +91,14 @@ npx esbuild typescript_screen.ts --bundle --outfile=typescript_screen.js --forma
 
 `--format=esm` (and even splitting output) works too. The important part is that the output is **_bundled_** with `--bundle`. BeamNG's CEF-based webview has trouble with raw, unbundled ES module imports, so bundling is an actual requirement in this case.
 
-You'd then load `typescript_screen.js` like any other plain JavaScript screen script (see below), and drop the Sucrase runtime scripts and `loadTS` call entirely. If using ESM, you use the `type="module"` script tag.
-
-A bundler-based project will typically have its own `tsconfig.json` already, which makes linking the framework's `beamng.d.ts` type declarations more straightforward than the JIT path described below.
-
-To use the included JIT TypeScript compiler instead, swap out your custom JavaScript file tag for the `loadTS` method of calling it, add the TypeScript runtime scripts, while keeping `screenInput.js`:
+You'd then load `typescript_screen.js` like any other plain JavaScript screen script, after `screenInput.js`. If using ESM, you use the `type="module"` script tag.
 
 ```html
 <script src="/ui/modules/screenInput.js"></script>
-<script src="/vehicles/yourcar/interactive_screen/javascript_infotainment.js"></script>
+<script src="/vehicles/yourcar/interactive_screen/typescript_screen.js"></script>
 ```
 
-becomes
-
-```html
-<script src="/ui/modules/screenInput.js"></script>
-<script src="/ui/lib/ext/sucrase/sucrase.js"></script>
-<script src="/ui/lib/ext/sucrase/tsRuntime.js"></script>
-<script>
-  loadTS("/vehicles/yourcar/interactive_screen/typescript_infotainment.ts");
-</script>
-```
-
-Your TypeScript file works like any other screen script. Wire up the BeamNG callbacks directly inside it:
+Wire up the BeamNG callbacks directly inside your TypeScript:
 
 ```typescript
 window.setup = (config) => {
@@ -125,14 +108,10 @@ window.updateData = (data) => {};
 window.updateMode = (data) => {};
 ```
 
-This also works for split file setups where the HTML is just layout and all logic lives in the `.ts` file. `loadTS` returns a Promise if you need to do anything after the script is ready, but currently, ScreenInput Framework does not have any features that require this.
-
 A few things worth knowing:
 
-- Types are stripped away when loading, so there is no type checking at runtime. Use your editor for that.
+- Bundlers strip types without checking them. Use your editor (or `tsc --noEmit`) for that.
 - Some types will need to be declared manually. Several base game and the framework's types are included in a definitions file. See the [TypeScript](#typescript) section below for details.
-- `export`/`import` statements are fully supported. Named exports from a loaded file land on `window` automatically, and relative imports (`import { yourExport } from "./other"`) work across TypeScript files. This same module structure is what makes it easy to switch to a bundler like esbuild or Vite later.
-- `import type` is fully safe to use.
 - `displayData` is used differently in the TypeScript setup. See the [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript) section for details.
 
 ---
@@ -551,7 +530,7 @@ The sections above apply equally to TypeScript screens. A few things behave diff
 
 **Vehicle data** - use `defineScreenData()` instead of reading from the `updateData` parameter. See [Receiving Vehicle Data in TypeScript](#receiving-vehicle-data-in-typescript).
 
-**Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Since this framework compiles your code on the fly without needing a complex `tsconfig.json` setup, your editor (like VS Code) won't automatically know what `defineScreenData`, `window.vehicleData`, or the standard `beamng` globals actually are.
+**Type declarations (`beamng.d.ts`)** - the framework ships a `beamng.d.ts` type declaration file (located in `ui/modules/beamng.d.ts`). Out of the box, your editor (like VS Code) won't know what `defineScreenData` or the standard `beamng` globals actually are.
 
 To fix "Cannot find name" errors, eliminate red squiggly lines, and get full autocompletion, you must explicitly link the `.d.ts` file so your editor can find it.
 
@@ -585,7 +564,7 @@ There are three primary ways to do this:
    }
    ```
 
-Because the Sucrase compiler strips out TypeScript types and comments before sending code to the browser engine, these triple-slash references are strictly for your editor to help you code.
+Types and comments are stripped when your screen is compiled, so these triple-slash references are strictly for your editor to help you code.
 
 ---
 
@@ -1101,12 +1080,7 @@ See `vehicles/vivace/vivace_infotainment/` for a complete working example with:
 - Multiple trigger volumes for physical buttons
 - Test menu HTML demonstrating the API
 
-Two variants of said test menu are included:
-
-- `js_example/` - HTML with inline JavaScript
-- `ts_example/` - TypeScript via the JIT compiler, with `defineScreenData` and multi-file imports
-
-Both share the same config files at the `vivace_infotainment/` root. The examples cover all core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
+The test menu lives in `js_example/` as HTML with inline JavaScript, and its config files sit at the `vivace_infotainment/` root. The example covers all core concepts and can be adapted for more complex implementations including multiple screens, additional reference planes, and advanced coordinate transformations.
 
 ---
 
