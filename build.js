@@ -16,11 +16,6 @@ const OUT = path.join(__dirname, "ui/modules/screenInput.js");
 const GENERATED_FILE_HEADER = `/**
  * !!! DO NOT EDIT MANUALLY !!!
  *
- * sneppy snep snep!
- *
- * Be warned (!!!!): using this code means you give
- *     away your soul to the snow leopard gods!
- *
  * Translates BeamNG coordinate events to browser-like events
  *
  * Part of the screenInput framework - makes vehicle HTML displays actually usable

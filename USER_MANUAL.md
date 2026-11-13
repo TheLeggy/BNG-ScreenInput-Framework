@@ -1127,5 +1127,3 @@ See the `LICENSE` file for the full license text and exact requirements.
 ---
 
 **Questions or issues?** The code includes extensive comments explaining the "why" behind design decisions. If something seems weird, there's probably a comment explaining that I don't know why it works either.
-
-**mrow~**

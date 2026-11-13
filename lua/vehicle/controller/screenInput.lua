@@ -1,8 +1,3 @@
--- sneppy snep snep! 
-
--- Be warned (!!!!): using this code means you give  
---    away your soul to the snow leopard gods!
-
 -- the bridge between the boxes/trigger data and the screen
 -- sends events and coordinates to the javascript for it to handle
 -- execution is still lua-side though
